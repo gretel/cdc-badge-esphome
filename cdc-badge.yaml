@@ -1,0 +1,857 @@
+---
+# RIAT BOOTCAMP 2026
+# https://github.com/gretel/cdc-badge-esphome
+
+substitutions:
+  # Device identity
+  device_name: cdc-badge
+  friendly_name: CDC Badge
+  project_name: "riat.at"
+  project_version: "0.1.0"
+
+  # Pinout — board variant support
+  pin_i2c_sda: GPIO17
+  pin_i2c_scl: GPIO18
+  pin_spi_clk: GPIO12
+  pin_spi_mosi: GPIO13
+  pin_spi_miso: GPIO11
+  pin_epd_cs: GPIO41
+  pin_epd_dc: GPIO45
+  pin_epd_rst: GPIO46
+  pin_epd_busy: GPIO42
+  pin_epd_led: GPIO8
+  pin_tr01_cs: GPIO10
+  pin_sao_io1: GPIO15
+  pin_sao_io2: GPIO16
+  pin_grove_in: GPIO2
+  pin_flash_btn: GPIO0
+  pin_wake: GPIO1
+  pin_exp_irq: GPIO1
+
+  # Charger
+  charger_i2c_addr: 0x6A
+  charger_max_ma: "1024"
+  charger_voltage_mv: "4208"
+  charger_input_ma: "500"
+  charger_precharge_ma: "128"
+
+  # Display
+  font_large: "14"
+  font_small: "12"
+  display_update_default: "60"
+  display_width: "128"
+  display_height: "296"
+  full_update_interval: "10"
+
+  # I2C
+  i2c_frequency: 100kHz
+
+
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  project:
+    name: ${project_name}
+    version: ${project_version}
+  min_version: 2026.5.0
+  area: "Bootcamp"
+  on_boot:
+    then:
+      - delay: 3s
+      - script.execute: display_loop
+      - delay: 2s
+      - light.turn_on:
+          id: epd_backlight
+          brightness: 1
+      - delay: 1s
+      - light.turn_off: epd_backlight
+
+esp32:
+  board: esp32-s3-devkitc1-n16r8
+  variant: ESP32S3
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+    advanced:
+      compiler_optimization: PERF
+      disable_libc_locks_in_iram: true
+      disable_vfs_support_dir: true
+      disable_vfs_support_select: true
+      disable_vfs_support_termios: true
+      enable_idf_experimental_features: true
+      enable_lwip_dhcp_server: false
+      execute_from_psram: true
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+external_components:
+  - source:
+      type: local
+      path: components
+
+# ── I2C Bus 0 (BQ25895 + TCA9535 + SAO EEPROM) ────────────────
+i2c:
+  - id: i2c0
+    sda: GPIO17
+    scl: GPIO18
+    frequency: 100kHz
+    scan: true
+
+# ── Power Management — BQ25895 (standalone component) ──────────
+bq25895:
+  id: badge_charger
+  i2c_id: i2c0
+  address: 0x6A
+  charge_current: 1024
+  charge_voltage: 4208
+  input_current_limit: 500
+  precharge_current: 128
+  charge_enabled: true
+  enable_status_led: false
+  enable_adc: true
+  update_interval: 30s
+
+# ── IO Expander — TCA9535 (via xl9535, register-identical) ────
+xl9535:
+  - id: keypad_expander
+    i2c_id: i2c0
+    address: 0x20
+
+# ── Display Backlight (GPIO8, PWM) — off by default ───────────
+output:
+  - platform: ledc
+    id: display_backlight
+    pin: GPIO8
+    frequency: 10000Hz
+
+light:
+  - platform: monochromatic
+    id: epd_backlight
+    name: "Display Backlight"
+    output: display_backlight
+    restore_mode: RESTORE_DEFAULT_OFF
+    effects:
+      - strobe:
+          name: Blink
+          colors:
+            - state: true
+              brightness: 1
+              duration: 300ms
+            - state: false
+              duration: 300ms
+
+logger:
+  level: DEBUG
+  hardware_uart: USB_SERIAL_JTAG
+  logs:
+    i2c.idf: WARN
+    epaper_spi: INFO
+
+esp32_ble:
+
+esp32_improv:
+  authorizer: flash_button
+
+api:
+  reboot_timeout: 0s
+  encryption:
+    key: !secret hass_key
+  services:
+    - service: notify
+      variables:
+        message: string
+      then:
+        - lambda: |-
+            std::string msg(message.c_str());
+            id(notif_msg).publish_state(msg);
+            id(badge_display)->update();
+        - light.turn_on: epd_backlight
+        - delay: 5s
+        - light.turn_off: epd_backlight
+
+    - service: blink_display
+      then:
+        - light.turn_on:
+            id: epd_backlight
+            effect: Blink
+        - delay: 1s
+        - light.turn_off:
+            id: epd_backlight
+        - delay: 500ms
+        - light.turn_on:
+            id: epd_backlight
+            brightness: 1
+
+    # ── TROPIC01 R-Memory storage services ──────────────────────
+    - service: se_write
+      variables:
+        slot: int
+        data: string
+      then:
+        - lambda: |-
+            {
+              std::string d = data;  // StringRef -> std::string
+              id(tr01)->r_mem_write(
+                (uint16_t)slot,
+                (const uint8_t *)d.data(), d.size());
+            }
+
+    - service: se_read
+      variables:
+        slot: int
+      then:
+        - lambda: |-
+            uint16_t read_len = 0;
+            id(tr01)->r_mem_read((uint16_t)slot, read_len);
+            if (read_len > 0) {
+              id(se_r_mem_value).publish_state(
+                std::string((const char *)id(tr01)->r_mem_buf(), read_len));
+            } else {
+              id(se_r_mem_value).publish_state("(empty)");
+            }
+
+    - service: se_erase
+      variables:
+        slot: int
+      then:
+        - lambda: "id(tr01)->r_mem_erase((uint16_t)slot);"
+
+ota:
+  platform: esphome
+  password: !secret ota_key
+
+safe_mode:
+  num_attempts: 3
+  reboot_timeout: 10min
+
+# ── Configurable display update interval ──────────────────────
+number:
+  - platform: template
+    id: display_update_interval
+    name: "Display Update Interval"
+    unit_of_measurement: "s"
+    min_value: 5
+    max_value: 3600
+    step: 5
+    initial_value: ${display_update_default}
+    restore_value: true
+    entity_category: "config"
+    optimistic: true
+
+
+# ── Sleep mode flag (set before deep sleep, cleared on boot) ──
+globals:
+  - id: refresh_count
+    type: int
+    initial_value: "0"
+    restore_value: no
+
+  - id: last_refresh
+    type: int
+    initial_value: "0"
+    restore_value: no
+
+  - id: sleep_mode
+    type: bool
+    initial_value: "false"
+    restore_value: no
+
+  - id: sleep_since
+    type: int
+    initial_value: "0"
+    restore_value: no
+
+
+# ── Display update loop + instant refresh ────────────────────
+script:
+  - id: refresh_display
+    mode: single
+    then:
+      - lambda: |-
+          id(refresh_count) = id(refresh_count) + 1;
+          id(last_refresh) = millis();
+      - lambda: "id(badge_display)->update();"
+      - delay: 2500ms
+
+  - id: display_loop
+    mode: restart
+    then:
+      - lambda: "id(badge_display)->update();"
+      - delay: !lambda |-
+          float interval = id(display_update_interval).state;
+          if (interval < 5) interval = 60;
+          return (int)(interval * 1000);
+      - script.execute: display_loop
+
+spi:
+  - id: spi_bus
+    clk_pin: GPIO12
+    mosi_pin: GPIO13
+    miso_pin: GPIO11
+
+# ── Display — GDEY029T94 (SSD1680 296×128, portrait) ──────────
+display:
+  - platform: epaper_spi
+    id: badge_display
+    model: ssd1683
+    dimensions:
+      width: 128
+      height: 296
+    cs_pin: GPIO41
+    dc_pin: GPIO45
+    reset_pin: GPIO46
+    busy_pin: GPIO42
+    full_update_every: 10
+    rotation: 90
+    init_sequence:
+      - [0x01, 0x27, 0x01, 0x00]
+      - [0x18, 0x80]
+      - [0x11, 0x03]
+    lambda: |-
+      // Sleep screen
+      if (id(sleep_mode)) {
+        it.fill(COLOR_ON);
+        it.print(5, 1, id(font_m), COLOR_OFF, "CDC Badge");
+        it.line(5, 17, 290, 17, COLOR_OFF);
+        if (id(sleep_since) > 0) {
+          time_t ts = id(sleep_since);
+          struct tm *st = localtime(&ts);
+          char buf[32];
+          std::strftime(buf, sizeof(buf), "Sleeping since %H:%M", st);
+          it.print(5, 40, id(font_s), COLOR_OFF, buf);
+        } else {
+          it.print(5, 40, id(font_s), COLOR_OFF, "Sleeping...");
+        }
+        it.print(5, 65, id(font_s), COLOR_OFF, "Any key to wake");
+        return;
+      }
+
+
+      // 296 x 128 after rotation
+      it.fill(COLOR_ON);
+      char buf[96];
+      int y = 1;
+
+      // ── Header (14px) ─────────────────────────────────
+      {
+        int n = std::snprintf(buf, sizeof(buf), "CDC Badge");
+        if (id(homeassistant_time).now().is_valid()) {
+          char t[6];
+          id(homeassistant_time).now().strftime(t, sizeof(t), "%H:%M");
+          n += std::snprintf(buf + n, sizeof(buf) - n, " %s", t);
+        }
+        if (id(badge_uptime).has_state()) {
+          int secs = (int)id(badge_uptime).state;
+          n += std::snprintf(buf + n, sizeof(buf) - n, " Up:%dh%dm",
+                             secs / 3600, (secs % 3600) / 60);
+        }
+        it.print(5, y, id(font_m), COLOR_OFF, buf);
+        y += 16;
+      }
+
+      it.line(5, y, 290, y, COLOR_OFF);
+      y += 4;
+
+      // ── Version ───────────────────────────────────────
+      if (id(badge_version).has_state())
+        it.printf(5, y, id(font_s), COLOR_OFF, "Ver:%s R:%d",
+                  id(badge_version).state.c_str(), id(refresh_count));
+      else
+        it.printf(5, y, id(font_s), COLOR_OFF, "Ver:-- R:%d", id(refresh_count));
+      y += 13;
+
+      // ── USB | CHG | Cur | B ──────────────────────────
+      {
+        const char *usb_raw = id(usb_bus_status).has_state()
+          ? id(usb_bus_status).state.c_str() : "--";
+        const char *usb = (strncmp(usb_raw, "USB-", 4) == 0)
+          ? usb_raw + 4 : usb_raw;
+        if (strcmp(usb, "None") == 0) usb = "-";
+
+        const char *chg = id(charge_status).has_state()
+          ? id(charge_status).state.c_str() : "--";
+        const char *chs = chg;
+        if (strcmp(chg, "Charging Done") == 0) chs = "Done";
+        else if (strcmp(chg, "Not Charging") == 0) chs = "NoPwr";
+        else if (strcmp(chg, "Pre-charging") == 0) chs = "PreChg";
+        else if (strcmp(chg, "Discharging") == 0) chs = "Dischg";
+        else if (strcmp(chg, "Charging") == 0) chs = "Chrg";
+
+        int n = std::snprintf(buf, sizeof(buf), "USB:%s | CHG:%s | ", usb, chs);
+        if (id(charge_current).has_state())
+          n += std::snprintf(buf + n, sizeof(buf) - n,
+                             "Cur:%.0f | ", id(charge_current).state);
+        else
+          n += std::snprintf(buf + n, sizeof(buf) - n, "Cur:-- | ");
+        if (id(batt_voltage).has_state())
+          n += std::snprintf(buf + n, sizeof(buf) - n,
+                             "B:%.2fV", id(batt_voltage).state);
+        else
+          n += std::snprintf(buf + n, sizeof(buf) - n, "B:--");
+        it.print(5, y, id(font_s), COLOR_OFF, buf);
+      }
+      y += 13;
+
+      // ── SE | T | WiFi | SSID ──────────────────────────
+      {
+        int n = std::snprintf(buf, sizeof(buf), "SE:%s | ",
+                              id(tr01_alarm).state ? "ALARM" : "OK");
+        if (id(core_temp).has_state())
+          n += std::snprintf(buf + n, sizeof(buf) - n,
+                             "T:%.1fC | ", id(core_temp).state);
+        else
+          n += std::snprintf(buf + n, sizeof(buf) - n, "T:-- | ");
+        if (id(wifi_sig).has_state()) {
+          float sig = id(wifi_sig).state;
+          int pct = (sig + 100.0f) * 2.0f;
+          if (pct < 0) pct = 0;
+          if (pct > 100) pct = 100;
+          n += std::snprintf(buf + n, sizeof(buf) - n,
+                             "W:%.0fdBm %d%%", sig, pct);
+        } else {
+          n += std::snprintf(buf + n, sizeof(buf) - n, "W:--");
+        }
+        if (id(wifi_ssid).has_state()) {
+          const char *sid = id(wifi_ssid).state.c_str();
+          n += std::snprintf(buf + n, sizeof(buf) - n, " %.10s", sid);
+        }
+        it.print(5, y, id(font_s), COLOR_OFF, buf);
+      }
+      y += 13;
+
+      // ── IP ────────────────────────────────────────────
+      if (id(ip_addr).has_state())
+        std::snprintf(buf, sizeof(buf), "IP:%s", id(ip_addr).state.c_str());
+      else
+        std::snprintf(buf, sizeof(buf), "IP:--");
+      it.print(5, y, id(font_s), COLOR_OFF, buf);
+      y += 13;
+
+      // ── Grove | IO1 | IO2 ─────────────────────────────
+      std::snprintf(buf, sizeof(buf), "Grove:%s | IO1:%s | IO2:%s",
+                    id(pir_motion).state ? "Active" : "Idle",
+                    id(sao_gpio1).state ? "ON" : "OFF",
+                    id(sao_gpio2).state ? "ON" : "OFF");
+      it.print(5, y, id(font_s), COLOR_OFF, buf);
+      y += 13;
+
+      // ── Notification (14px) ───────────────────────────
+      it.line(5, y, 290, y, COLOR_OFF);
+      y += 4;
+      if (strlen(id(notif_msg).state.c_str()) > 0)
+        it.print(5, y, id(font_m), COLOR_OFF,
+                 id(notif_msg).state.c_str());
+
+font:
+  - file: "gfonts://Inter"
+    id: font_m
+    size: ${font_large}
+  - file: "gfonts://Inter"
+    id: font_s
+    size: ${font_small}
+
+# ── SAO Expansion Port (GPIO15 = IO1, GPIO16 = IO2) ──────────
+switch:
+  - platform: gpio
+    id: sao_gpio1
+    name: "SAO IO1"
+    pin: GPIO15
+    restore_mode: RESTORE_DEFAULT_ON
+    on_turn_on:
+      then:
+        - script.execute: refresh_display
+    on_turn_off:
+      then:
+        - script.execute: refresh_display
+  - platform: gpio
+    id: sao_gpio2
+    name: "SAO IO2"
+    pin: GPIO16
+    restore_mode: RESTORE_DEFAULT_ON
+    on_turn_on:
+      then:
+        - script.execute: refresh_display
+    on_turn_off:
+      then:
+        - script.execute: refresh_display
+
+button:
+  - platform: restart
+    id: reboot_btn
+    name: "Restart"
+    icon: "mdi:restart"
+    entity_category: "config"
+  - platform: safe_mode
+    id: safe_mode_btn
+    name: "Safe Mode Boot"
+    entity_category: "config"
+  - platform: template
+    id: sleep_btn
+    name: "Deep Sleep"
+    icon: "mdi:sleep"
+    entity_category: "config"
+    on_press:
+      then:
+        - lambda: |-
+            id(sleep_mode) = true;
+            id(sleep_since) = id(homeassistant_time).now().timestamp;
+        - script.stop: display_loop
+        - lambda: "id(badge_display)->update();"
+        - delay: 2s
+        - light.turn_off: epd_backlight
+        - delay: 200ms
+        - lambda: |-
+            // Read TCA9535 input ports to clear pending INT before sleep
+            { uint8_t v; id(keypad_expander)->read_byte(0x00, &v); id(keypad_expander)->read_byte(0x01, &v); }
+        - deep_sleep.enter
+  - platform: template
+    id: refresh_btn
+    name: "Refresh Display"
+    icon: "mdi:refresh"
+    entity_category: "config"
+    on_press:
+      then:
+        - script.execute: refresh_display
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_pass
+  fast_connect: on
+
+captive_portal:
+
+web_server:
+  port: 80
+  version: 3
+  local: true
+  ota: false
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+
+# ═══════════════════════════════════════════════════════════════
+# TROPIC01 Secure Element
+# ═══════════════════════════════════════════════════════════════
+tropic01:
+  id: tr01
+  cs_pin: 10
+  data_rate: 10000000
+  chip_mode:
+    id: tr01_chip_mode
+    name: "TROPIC01 Chip Mode"
+  fw_version_riscv:
+    id: tr01_fw_rv
+    name: "TROPIC01 RISC-V FW"
+  fw_version_spect:
+    id: tr01_fw_spect
+    name: "TROPIC01 Spect FW"
+  chip_serial:
+    id: tr01_serial
+    name: "TROPIC01 Serial"
+  alarm:
+    id: tr01_alarm
+    name: "TROPIC01 Tamper Alarm"
+
+# ═══════════════════════════════════════════════════════════════
+# Sensors
+# ═══════════════════════════════════════════════════════════════
+
+text_sensor:
+  - platform: version
+    id: badge_version
+    name: "Version"
+    icon: "mdi:exponent-box"
+
+  - platform: wifi_info
+    ip_address:
+      id: ip_addr
+      icon: "mdi:counter"
+      name: "IP Address"
+    ssid:
+      id: wifi_ssid
+      name: "SSID"
+
+  - platform: bq25895
+    bq25895_id: badge_charger
+    charge_status:
+      id: charge_status
+      name: "Charge Status"
+      on_value:
+        then:
+          - script.execute: refresh_display
+    bus_status:
+      id: usb_bus_status
+      name: "USB Bus Status"
+      on_value:
+        then:
+          - script.execute: refresh_display
+
+  # TROPIC01 R-Memory read result
+  - platform: template
+    id: se_r_mem_value
+    name: "SE R-Memory Value"
+
+  # Notification (set from HA via notify service)
+  - platform: template
+    id: notif_msg
+    name: "Badge Notification"
+    update_interval: never
+    on_value:
+      then:
+        - lambda: "id(badge_display)->update();"
+
+sensor:
+  # ── Charger sensors ──────────────────────────────────────────
+  - platform: bq25895
+    bq25895_id: badge_charger
+    battery_voltage:
+      id: batt_voltage
+      name: "Battery Voltage"
+    vbus_voltage:
+      id: usb_voltage
+      name: "USB Voltage"
+    charge_current:
+      id: charge_current
+      name: "Charge Current"
+      on_value:
+        then:
+          - script.execute: refresh_display
+
+  # ── Chip sensors ─────────────────────────────────────────────
+  - platform: internal_temperature
+    id: core_temp
+    name: "Core Temperature"
+    update_interval: 60s
+
+  - platform: uptime
+    id: badge_uptime
+    name: "Uptime"
+    update_interval: 60s
+    icon: "mdi:clock-start"
+
+  - platform: wifi_signal
+    id: wifi_sig
+    name: "WiFi Signal"
+    update_interval: 30s
+    icon: "mdi:wifi"
+
+  - platform: copy
+    id: wifi_strength
+    source_id: wifi_sig
+    name: "WiFi Strength"
+    filters:
+      - lambda: return min(max(2 * (x + 100.0), 0.0), 100.0);
+    unit_of_measurement: "%"
+    entity_category: "diagnostic"
+
+  - platform: template
+    id: battery_pct
+    name: "Battery Level"
+    unit_of_measurement: "%"
+    update_interval: 30s
+    lambda: |-
+      if (!id(batt_voltage).has_state()) return NAN;
+      float v = id(batt_voltage).state;
+      // LiPo: 3.0V = 0%, 4.2V = 100%
+      float pct = (v - 3.0) / 1.2 * 100.0;
+      if (pct < 0) pct = 0;
+      if (pct > 100) pct = 100;
+      return pct;
+    icon: "mdi:battery"
+
+  - platform: template
+    id: battery_runtime
+    name: "Battery Runtime"
+    unit_of_measurement: "h"
+    update_interval: 60s
+    lambda: |-
+      if (!id(batt_voltage).has_state()) return NAN;
+      float v = id(batt_voltage).state;
+      float pct = (v - 3.0) / 1.2;
+      if (pct < 0) pct = 0;
+      if (pct > 1) pct = 1;
+      // ~200mA avg draw, 1200mAh battery
+      return pct * 1200.0 / 200.0;
+    icon: "mdi:battery-clock"
+
+binary_sensor:
+  - platform: status
+    name: "Status"
+
+  # ── Keypad (12 keys via TCA9535) ─────────────────────────────
+  - platform: gpio
+    id: key_0
+    name: "Key 0"
+    pin:
+      xl9535: keypad_expander
+      number: 0
+      mode: INPUT
+      inverted: true
+    on_state:
+      then:
+        - script.execute: refresh_display
+  - platform: gpio
+    id: key_1
+    name: "Key 1"
+    pin:
+      xl9535: keypad_expander
+      number: 1
+      mode: INPUT
+      inverted: true
+    on_state:
+      then:
+        - script.execute: refresh_display
+  - platform: gpio
+    id: key_2
+    name: "Key 2"
+    pin:
+      xl9535: keypad_expander
+      number: 2
+      mode: INPUT
+      inverted: true
+    on_state:
+      then:
+        - script.execute: refresh_display
+  - platform: gpio
+    id: key_3
+    name: "Key 3"
+    pin:
+      xl9535: keypad_expander
+      number: 3
+      mode: INPUT
+      inverted: true
+    on_state:
+      then:
+        - script.execute: refresh_display
+  - platform: gpio
+    id: key_4
+    name: "Key 4"
+    pin:
+      xl9535: keypad_expander
+      number: 4
+      mode: INPUT
+      inverted: true
+    on_state:
+      then:
+        - script.execute: refresh_display
+  - platform: gpio
+    id: key_5
+    name: "Key 5"
+    pin:
+      xl9535: keypad_expander
+      number: 5
+      mode: INPUT
+      inverted: true
+    on_state:
+      then:
+        - script.execute: refresh_display
+  - platform: gpio
+    id: key_6
+    name: "Key 6"
+    pin:
+      xl9535: keypad_expander
+      number: 6
+      mode: INPUT
+      inverted: true
+    on_state:
+      then:
+        - script.execute: refresh_display
+  - platform: gpio
+    id: key_7
+    name: "Key 7"
+    pin:
+      xl9535: keypad_expander
+      number: 7
+      mode: INPUT
+      inverted: true
+    on_state:
+      then:
+        - script.execute: refresh_display
+  - platform: gpio
+    id: key_8
+    name: "Key 8"
+    pin:
+      xl9535: keypad_expander
+      number: 10
+      mode: INPUT
+      inverted: true
+    on_state:
+      then:
+        - script.execute: refresh_display
+  - platform: gpio
+    id: key_9
+    name: "Key 9"
+    pin:
+      xl9535: keypad_expander
+      number: 11
+      mode: INPUT
+      inverted: true
+    on_state:
+      then:
+        - script.execute: refresh_display
+  - platform: gpio
+    id: key_yes
+    name: "Key YES"
+    pin:
+      xl9535: keypad_expander
+      number: 12
+      mode: INPUT
+      inverted: true
+    on_state:
+      then:
+        - script.execute: refresh_display
+  - platform: gpio
+    id: key_no
+    name: "Key NO"
+    pin:
+      xl9535: keypad_expander
+      number: 13
+      mode: INPUT
+      inverted: true
+    on_state:
+      then:
+        - script.execute: refresh_display
+
+  # ── PIR Motion Sensor (Grove D2 / GPIO2)
+  - platform: gpio
+    id: pir_motion
+    name: "Motion"
+    device_class: motion
+    pin:
+      number: GPIO2
+      mode: INPUT_PULLUP
+    filters:
+      - delayed_on: 100ms
+      - delayed_off: 3s
+    on_state:
+      then:
+        - script.execute: refresh_display
+
+  # ── Charger VBUS detection (status only) ─────────────────────
+  - platform: bq25895
+    bq25895_id: badge_charger
+    vbus_connected:
+      id: charger_vbus
+
+  # ── Flash/Boot Button (GPIO0) ────────────────────────────────
+  - platform: gpio
+    id: flash_button
+    pin:
+      number: GPIO0
+      inverted: true
+      mode: INPUT_PULLUP
+    name: "Flash Button"
+
+# ── Deep sleep — wake on keypad interrupt (GPIO1 / EXP_IRQ) ──
+deep_sleep:
+  id: badge_deep_sleep
+  wakeup_pin:
+    number: GPIO1
+    inverted: true
+    mode: INPUT_PULLUP
+
+

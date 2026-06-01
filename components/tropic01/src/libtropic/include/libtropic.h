@@ -1,0 +1,778 @@
+#ifndef LT_LIBTROPIC_H
+#define LT_LIBTROPIC_H
+
+/**
+ * @defgroup libtropic_API 1. Libtropic API
+ * @brief Expected to be used by an application
+ * @details Dear users, please use this API. It contains all functions you need to interface with TROPIC01 device.
+ * @{
+ */
+
+/**
+ * @file libtropic.h
+ * @brief Libtropic library main API header file.
+ * @copyright Copyright (c) 2020-2025 Tropic Square s.r.o.
+ *
+ * @license For the license see file LICENSE.txt file in the root directory of this source tree.
+ */
+
+#include <stdbool.h>
+#include <stddef.h>
+
+#include "libtropic_common.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Initialize handle and transport layer
+ *
+ * @param h           Handle for communication with TROPIC01
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ *
+ */
+lt_ret_t lt_init(lt_handle_t *h);
+
+/**
+ * @brief Deinitialize handle and transport layer
+ *
+ * @note              Data used for the Secure Session are always invalidated regardless
+ *                    of the return value (if you pass correct handle).
+ *                    After calling this function, it will not be possible to send L3 commands
+ *                    unless new Secure Session is started.
+ *
+ * @param h           Handle for communication with TROPIC01
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_deinit(lt_handle_t *h);
+
+/**
+ * @brief Gets current mode (Libtropic defined, see lt_tr01_mode_t) of TROPIC01.
+ * @note The `mode` parameter can be considered valid only when this function returns LT_OK.
+ *
+ * @param h            Handle for communication with TROPIC01
+ * @param[out] mode    Current mode of TROPIC01
+ *
+ * @retval             LT_OK Function executed successfully
+ * @retval             other Function did not execute successully, you might use lt_ret_verbose() to get verbose
+ * encoding of returned value. The `mode` parameter should **not** be considered valid.
+ */
+lt_ret_t lt_get_tr01_mode(lt_handle_t *h, lt_tr01_mode_t *mode);
+
+/**
+ * @brief Read out PKI chain from TROPIC01's Certificate Store
+ *
+ * @param h           Handle for communication with TROPIC01
+ * @param store       Certificate store handle to be filled
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_get_info_cert_store(lt_handle_t *h, struct lt_cert_store_t *store);
+
+/**
+ * @brief Extracts ST_Pub from TROPIC01's Certificate Store
+ *
+ * @param store       Certificate store handle
+ * @param stpub       When the function executes successfully, TROPIC01's STPUB of length `TR01_STPUB_LEN` will be
+ * written into this buffer
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_get_st_pub(const struct lt_cert_store_t *store, uint8_t *stpub);
+
+//--------------------------------------------------------------------------------------------------------------------//
+/** @brief Maximal size of returned CHIP ID */
+#define TR01_L2_GET_INFO_CHIP_ID_SIZE 128
+
+/**
+ * @brief Read TROPIC01's CHIP ID
+ *
+ * @param h           Handle for communication with TROPIC01
+ * @param chip_id     Structure which holds all fields of CHIP ID
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_get_info_chip_id(lt_handle_t *h, struct lt_chip_id_t *chip_id);
+
+/**
+ * @brief Read TROPIC01's RISC-V firmware version
+ *
+ * @param h           Handle for communication with TROPIC01
+ * @param ver Buffer for FW version bytes with size `TR01_L2_GET_INFO_RISCV_FW_SIZE`
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_get_info_riscv_fw_ver(lt_handle_t *h, uint8_t *ver);
+
+/**
+ * @brief Read TROPIC01's SPECT firmware version
+ *
+ * @param h           Handle for communication with TROPIC01
+ * @param ver Buffer for SPECT version bytes with size `TR01_L2_GET_INFO_SPECT_FW_SIZE`
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_get_info_spect_fw_ver(lt_handle_t *h, uint8_t *ver);
+
+/**
+ * @brief Read TROPIC01's firmware bank info
+ *
+ * @note  Reported git hashes will not match for certain old firmware versions, see documentation for details.
+ *
+ * @param h                  Handle for communication with TROPIC01
+ * @param bank_id            ID of firmware bank (one from enum lt_bank_id_t)
+ * @param header             Buffer to store fw header bytes into
+ * @param header_max_size    Size of the header buffer
+ * @param header_read_size   Number of bytes read into the header buffer
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_get_info_fw_bank(lt_handle_t *h, const lt_bank_id_t bank_id, uint8_t *header,
+                             const uint16_t header_max_size, uint16_t *header_read_size);
+
+/**
+ * @brief Establishes encrypted secure session between TROPIC01 and host MCU
+ *
+ * @note              To successfully estabilish Secure Session, you need to know Tropic01's X25519 public key.
+ *                    (STPUB). The STPUB can be obtained using lt_get_st_pub, or you can use
+ *                    lt_verify_chip_and_start_secure_session helper function, which will obtain the STPUB
+ *                    automatically and set up the Secure Session for you.
+ *
+ * @param h           Handle for communication with TROPIC01
+ * @param stpub       STPUB from device's certificate
+ * @param pkey_index  Index of pairing public key
+ * @param shipriv     Secure host private key
+ * @param shipub      Secure host public key
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_session_start(lt_handle_t *h, const uint8_t *stpub, const lt_pkey_index_t pkey_index,
+                          const uint8_t *shipriv, const uint8_t *shipub);
+
+/**
+ * @brief Aborts encrypted secure session between TROPIC01 and host MCU
+ *
+ * @note              Data used for the Secure Session are always invalidated regardless
+ *                    of the result of the abort request (if you pass correct handle).
+ *                    After calling this function, it will not be possible to send L3 commands
+ *                    unless new Secure Session is started.
+ *
+ * @param h           Handle for communication with TROPIC01
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_session_abort(lt_handle_t *h);
+
+/**
+ * @brief Puts TROPIC01 into sleep
+ *
+ * @param h           Handle for communication with TROPIC01
+ * @param sleep_kind  Kind of sleep
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_sleep(lt_handle_t *h, const uint8_t sleep_kind);
+
+/**
+ * @brief Reboots TROPIC01
+ *
+ * @param h           Handle for communication with TROPIC01
+ * @param startup_id  Startup ID (determines into which mode will TROPIC01 reboot)
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_reboot(lt_handle_t *h, const lt_startup_id_t startup_id);
+
+#ifdef ABAB
+/** @brief Maximal size of update data */
+#define TR01_MUTABLE_FW_UPDATE_SIZE_MAX 25600
+/**
+ * @brief Erase mutable firmware in one of banks
+ *
+ * @param h           Handle for communication with TROPIC01
+ * @param bank_id     enum lt_bank_id_t
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_mutable_fw_erase(lt_handle_t *h, const lt_bank_id_t bank_id);
+
+/**
+ * @brief Update mutable firmware in one of banks
+ *
+ * @param h             Handle for communication with TROPIC01
+ * @param fw_data       Array with firmware bytes
+ * @param fw_data_size  Number of firmware's bytes in passed array
+ * @param bank_id       enum lt_bank_id_t
+ * lt_ret_t             LT_OK            - SUCCESS
+ *                      other parameters - ERROR, for verbose output pass return value to function lt_ret_verbose()
+ */
+lt_ret_t lt_mutable_fw_update(lt_handle_t *h, const uint8_t *fw_data, const uint16_t fw_data_size,
+                              lt_bank_id_t bank_id);
+
+#elif ACAB
+/** @brief Maximal size of update data */
+#define TR01_MUTABLE_FW_UPDATE_SIZE_MAX 30720
+
+/**
+ * @brief Sends mutable firmware update L2 request to TROPIC01 with silicon revision ACAB
+ *
+ * @param h               Handle for communication with TROPIC01
+ * @param update_request  Array with firmware update request bytes
+ * @return                LT_OK if success, otherwise returns other error code.
+ */
+lt_ret_t lt_mutable_fw_update(lt_handle_t *h, const uint8_t *update_request);
+
+/**
+ * @brief Sends mutable firmware update data to TROPIC01 with silicon revision ACAB. Function
+ * `lt_mutable_fw_update()` must be called first to start authenticated mutable fw update.
+ *
+ * @param h                 Handle for communication with TROPIC01
+ * @param update_data       Array with firmware update data bytes
+ * @param update_data_size  Size of update data
+ * @return                  LT_OK if success, otherwise returns other error code.
+ */
+lt_ret_t lt_mutable_fw_update_data(lt_handle_t *h, const uint8_t *update_data, const uint16_t update_data_size);
+
+#endif
+/**
+ * @brief Gets Log message of TROPIC01's RISC-V FW (if enabled/available).
+ * @note RISC-V FW logging can be disabled in the I/R-Config and for the production chips, it **will** be disabled. This
+ * function is used mainly for internal debugging and not expected to be used by the user.
+ *
+ * @param h                    Handle for communication with TROPIC01
+ * @param log_msg              Buffer for the log message (atleast 255B)
+ * @param log_msg_max_size     Size of the log message buffer
+ * @param log_msg_read_size    Number of bytes read into the log message buffer
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_get_log_req(lt_handle_t *h, uint8_t *log_msg, const uint16_t log_msg_max_size, uint16_t *log_msg_read_size);
+
+/**
+ * @brief A dummy command to check the Secure Channel Session communication by exchanging a message with TROPIC01, whish
+ * is echoed through the Secure Channel.
+ *
+ * @param h           Handle for communication with TROPIC01
+ * @param msg_out     Ping message going out
+ * @param msg_in      Ping message going in
+ * @param msg_len     Length of both messages (msg_out and msg_in)
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_ping(lt_handle_t *h, const uint8_t *msg_out, uint8_t *msg_in, const uint16_t msg_len);
+
+/**
+ * @brief Writes pairing public key into TROPIC01's pairing key slot 0-3
+ * @warning The pairing keys reside in I-Memory, which has narrower operating temperature range (-20 °C to 85 °C) than
+ * the rest of TROPIC01. New CPU firmware versions (v2.0.0 and newer) return error when the operation is unsuccessful,
+ * but with older firmwares the operation fails silently. If you use CPU firmware older than v2.0.0, make sure to
+ * manually check whether the pairing key was correctly written if operating outside this range. Refer to datasheet for
+ * absolute maximum ratings.
+ *
+ * @param h           Handle for communication with TROPIC01
+ * @param pairing_pub 32B of pubkey
+ * @param slot        Pairing key lot SH0PUB - SH3PUB
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_pairing_key_write(lt_handle_t *h, const uint8_t *pairing_pub, const uint8_t slot);
+
+/**
+ * @brief Reads pairing public key from TROPIC01's pairing key slot 0-3
+ *
+ * @param h           Handle for communication with TROPIC01
+ * @param pairing_pub 32B of pubkey
+ * @param slot        Pairing key lot SH0PUB - SH3PUB
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_pairing_key_read(lt_handle_t *h, uint8_t *pairing_pub, const uint8_t slot);
+
+/**
+ * @brief Invalidates pairing key in slot 0-3
+ * @warning The pairing keys reside in I-Memory, which has narrower operating temperature range (-20 °C to 85 °C) than
+ * the rest of TROPIC01. New CPU firmware versions (v2.0.0 and newer) return error when the operation is unsuccessful,
+ * but with older firmwares the operation fails silently. If you use CPU firmware older than v2.0.0, make sure to
+ * manually check whether the pairing key was correctly invalidated if operating outside this range. Refer to datasheet
+ * for absolute maximum ratings.
+ *
+ * @param h           Handle for communication with TROPIC01
+ * @param slot        Pairing key lot SH0PUB - SH3PUB
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_pairing_key_invalidate(lt_handle_t *h, const uint8_t slot);
+
+/**
+ * @brief Writes configuration object specified by `addr`
+ *
+ * @param h           Handle for communication with TROPIC01
+ * @param addr        Address of a config object
+ * @param obj         Content to be written
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_r_config_write(lt_handle_t *h, const enum lt_config_obj_addr_t addr, const uint32_t obj);
+
+/**
+ * @brief Reads configuration object specified by `addr`
+ *
+ * @param h           Handle for communication with TROPIC01
+ * @param addr        Address of a config object
+ * @param obj         Variable to read content into
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ *
+ */
+lt_ret_t lt_r_config_read(lt_handle_t *h, const enum lt_config_obj_addr_t addr, uint32_t *obj);
+
+/**
+ * @brief Erases all configuration objects
+ *
+ * @param h           Handle for communication with TROPIC01
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_r_config_erase(lt_handle_t *h);
+
+/**
+ * @brief Writes configuration object specified by `addr` to I-Config
+ * @warning The I-Config resides in I-Memory, which has narrower operating temperature range (-20 °C to 85 °C) than
+ * the rest of TROPIC01. New CPU firmware versions (v2.0.0 and newer) return error when the operation is unsuccessful,
+ * but with older firmwares the operation fails silently. If you use CPU firmware older than v2.0.0, make sure to
+ * manually check whether the I-Config was correctly written if operating outside this range. Refer to datasheet for
+ * absolute maximum ratings.
+ *
+ * @param h           Handle for communication with TROPIC01
+ * @param addr        Address of a config object
+ * @param bit_index   Index of bit to write from 1 to 0
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_i_config_write(lt_handle_t *h, const enum lt_config_obj_addr_t addr, const uint8_t bit_index);
+
+/**
+ * @brief Reads configuration object specified by `addr` from I-Config
+ *
+ * @param h           Handle for communication with TROPIC01
+ * @param addr        Address of a config object
+ * @param obj         Variable to read content into
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_i_config_read(lt_handle_t *h, const enum lt_config_obj_addr_t addr, uint32_t *obj);
+
+/**
+ * @brief Writes bytes into a given slot of the User Partition in the R memory
+ *
+ * @param h           Handle for communication with TROPIC01
+ * @param udata_slot  Memory's slot to be written
+ * @param data        Buffer of data to be written into R MEMORY slot
+ * @param data_size   Size of data to be written (valid range given by macros `TR01_R_MEM_DATA_SIZE_MIN` and
+ * `TR01_R_MEM_DATA_SIZE_MAX`)
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_r_mem_data_write(lt_handle_t *h, const uint16_t udata_slot, const uint8_t *data, const uint16_t data_size);
+
+/**
+ * @brief Reads bytes from a given slot of the User Partition in the R memory
+ *
+ * @param h                Handle for communication with TROPIC01
+ * @param udata_slot       Memory's slot to be read
+ * @param data             Buffer to read data into
+ * @param data_max_size    Size of the data buffer
+ * @param data_read_size   Number of bytes read into data buffer
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_r_mem_data_read(lt_handle_t *h, const uint16_t udata_slot, uint8_t *data, const uint16_t data_max_size,
+                            uint16_t *data_read_size);
+
+/**
+ * @brief Erases the given slot of the User Partition in the R memory
+ *
+ * @param h           Handle for communication with TROPIC01
+ * @param udata_slot  Memory's slot to be erased
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_r_mem_data_erase(lt_handle_t *h, const uint16_t udata_slot);
+
+/**
+ * @brief Gets random bytes from TROPIC01's Random Number Generator.
+ *
+ * @param h                 Handle for communication with TROPIC01
+ * @param rnd_bytes         Buffer for the random bytes
+ * @param rnd_bytes_cnt     Number of random bytes to get (255 bytes is the maximum)
+ *
+ * @retval                  LT_OK Function executed successfully
+ * @retval                  other Function did not execute successully, you might use lt_ret_verbose() to get verbose
+ * encoding of returned value
+ */
+lt_ret_t lt_random_value_get(lt_handle_t *h, uint8_t *rnd_bytes, const uint16_t rnd_bytes_cnt);
+
+/**
+ * @brief Generates ECC key in the specified ECC key slot
+ *
+ * @param h           Handle for communication with TROPIC01
+ * @param slot        Slot number lt_ecc_slot_t
+ * @param curve       Type of ECC curve. Use L3_ECC_KEY_GENERATE_CURVE_ED25519 or L3_ECC_KEY_GENERATE_CURVE_P256
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_ecc_key_generate(lt_handle_t *h, const lt_ecc_slot_t slot, const lt_ecc_curve_type_t curve);
+
+/**
+ * @brief Stores ECC key to the specified ECC key slot
+ *
+ * @param h           Handle for communication with TROPIC01
+ * @param slot        Slot number lt_ecc_slot_t
+ * @param curve       Type of ECC curve. Use L3_ECC_KEY_GENERATE_CURVE_ED25519 or L3_ECC_KEY_GENERATE_CURVE_P256
+ * @param key         Key to store (only the first 32 bytes are stored)
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_ecc_key_store(lt_handle_t *h, const lt_ecc_slot_t slot, const lt_ecc_curve_type_t curve,
+                          const uint8_t *key);
+
+/**
+ * @brief Reads ECC public key corresponding to a private key in the specified ECC key slot.
+ *
+ * @param h              Handle for communication with TROPIC01
+ * @param ecc_slot       Slot number TR01_ECC_SLOT_0 - TR01_ECC_SLOT_31
+ * @param key            Buffer for retrieving a key; length depends on the type of key in the slot (32B for Ed25519,
+ * 64B for P256), according to *curve*
+ * @param key_max_size   Size of the key buffer
+ * @param curve          When the function executes successfully, the type of elliptic curve public key will be written
+ * @param origin         When the function executes successfully, the origin of the public key (generated/stored) will
+ * be written
+ *
+ * @retval               LT_OK Function executed successfully
+ * @retval               other Function did not execute successully, you might use lt_ret_verbose() to get verbose
+ * encoding of returned value
+ */
+lt_ret_t lt_ecc_key_read(lt_handle_t *h, const lt_ecc_slot_t ecc_slot, uint8_t *key, const uint8_t key_max_size,
+                         lt_ecc_curve_type_t *curve, lt_ecc_key_origin_t *origin);
+
+/**
+ * @brief Erases ECC key from the specified ECC key slot
+ *
+ * @param h           Handle for communication with TROPIC01
+ * @param ecc_slot    Slot number TR01_ECC_SLOT_0 - TR01_ECC_SLOT_31
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_ecc_key_erase(lt_handle_t *h, const lt_ecc_slot_t ecc_slot);
+
+/**
+ * @brief Performs ECDSA sign of a message with a private ECC key stored in TROPIC01
+ *
+ * @param h           Handle for communication with TROPIC01
+ * @param ecc_slot    Slot containing a private key, TR01_ECC_SLOT_0 - TR01_ECC_SLOT_31
+ * @param msg         Buffer containing a message
+ * @param msg_len     Length of the message
+ * @param rs          Buffer for storing a signature in a form of R and S bytes (should always have length 64B)
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_ecc_ecdsa_sign(lt_handle_t *h, const lt_ecc_slot_t ecc_slot, const uint8_t *msg, const uint32_t msg_len,
+                           uint8_t *rs);
+
+/**
+ * @brief Performs EdDSA sign of a message with a private ECC key stored in TROPIC01
+ *
+ * @param h           Handle for communication with TROPIC01
+ * @param ecc_slot    Slot containing a private key, TR01_ECC_SLOT_0 - TR01_ECC_SLOT_31
+ * @param msg         Buffer containing a message to sign, max length is 4096B
+ * @param msg_len     Length of the message
+ * @param rs          Buffer for storing a signature in a form of R and S bytes (should always have length 64B)
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_ecc_eddsa_sign(lt_handle_t *h, const lt_ecc_slot_t ecc_slot, const uint8_t *msg, const uint16_t msg_len,
+                           uint8_t *rs);
+
+/**
+ * @brief Initializes monotonic counter of a given index
+ *
+ * @param h               Handle for communication with TROPIC01
+ * @param mcounter_index  Index of monotonic counter
+ * @param mcounter_value  Value to set as an initial value (allowed range is 0-`TR01_MCOUNTER_VALUE_MAX`)
+ *
+ * @retval                LT_OK Function executed successfully
+ * @retval                other Function did not execute successully, you might use lt_ret_verbose() to get verbose
+ * encoding of returned value
+ */
+lt_ret_t lt_mcounter_init(lt_handle_t *h, const enum lt_mcounter_index_t mcounter_index, const uint32_t mcounter_value);
+
+/**
+ * @brief Updates monotonic counter of a given index
+ *
+ * @param h               Handle for communication with TROPIC01
+ * @param mcounter_index  Index of monotonic counter
+ *
+ * @retval                LT_OK Function executed successfully
+ * @retval                other Function did not execute successully, you might use lt_ret_verbose() to get verbose
+ * encoding of returned value
+ */
+lt_ret_t lt_mcounter_update(lt_handle_t *h, const enum lt_mcounter_index_t mcounter_index);
+
+/**
+ * @brief Gets a value of a monotonic counter of a given index
+ *
+ * @param h               Handle for communication with TROPIC01
+ * @param mcounter_index  Index of monotonic counter
+ * @param mcounter_value  Value of monotonic counter (from range 0-`TR01_MCOUNTER_VALUE_MAX`)
+ *
+ * @retval                LT_OK Function executed successfully
+ * @retval                other Function did not execute successully, you might use lt_ret_verbose() to get verbose
+ * encoding of returned value
+ */
+lt_ret_t lt_mcounter_get(lt_handle_t *h, const enum lt_mcounter_index_t mcounter_index, uint32_t *mcounter_value);
+
+/**
+ * @brief Executes the MAC-and-Destroy sequence.
+ * @details This command is just a part of MAC And Destroy sequence, which takes place between the host and TROPIC01.
+ *          Example code can be found in examples/lt_ex_macandd.c, for more info about Mac And Destroy functionality,
+ * read the Application note.
+ *
+ * @param h           Handle for communication with TROPIC01
+ * @param slot        Mac-and-Destroy slot index, valid values are 0-127
+ * @param data_out    Data to be sent from host to TROPIC01
+ * @param data_in     Data returned from TROPIC01 to host
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_mac_and_destroy(lt_handle_t *h, const lt_mac_and_destroy_slot_t slot, const uint8_t *data_out,
+                            uint8_t *data_in);
+
+/** @} */  // end of libtropic_API group
+
+#ifdef LT_HELPERS
+/**
+ * @defgroup libtropic_API_helpers 1.1. Libtropic API: Helpers
+ * @brief These functions are usually wrappers around one or more TROPIC01 commands, beside `lt_ret_verbose()` and
+ * `lt_print_bytes()`.
+ * @{
+ */
+
+/** @brief Upper bound for CHIP_ID fields as hex string (used in lt_print_chip_id()). */
+#define LT_CHIP_ID_FIELD_MAX_SIZE 35
+
+/** @brief Helper structure, holding string name and address for each configuration object. */
+extern struct lt_config_obj_desc_t cfg_desc_table[LT_CONFIG_OBJ_CNT];
+
+/**
+ * @brief Prints out a name of the returned value.
+ *
+ * @param ret         lt_ret_t returned type value
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+const char *lt_ret_verbose(lt_ret_t ret);
+
+/**
+ * @brief Writes the whole R-Config with the passed `config`.
+ *
+ * @param h           Handle for communication with TROPIC01
+ * @param config      Array into which objects are read
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_write_whole_R_config(lt_handle_t *h, const struct lt_config_t *config);
+
+/**
+ * @brief Reads all of the R-Config objects into `config`.
+ *
+ * @param h           Handle for communication with TROPIC01
+ * @param config      Struct into which objects are readed
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_read_whole_R_config(lt_handle_t *h, struct lt_config_t *config);
+
+/**
+ * @brief Reads all of the I-Config objects into `config`.
+ *
+ * @param h           Handle for communication with TROPIC01
+ * @param config      Struct into which objects are readed
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_read_whole_I_config(lt_handle_t *h, struct lt_config_t *config);
+
+/**
+ * @brief Writes the whole I-Config with the passed `config`.
+ * @details Only the zero bits in `config` are written.
+ * @warning The I-Config resides in I-Memory, which has narrower operating temperature range (-20 °C to 85 °C) than
+ * the rest of TROPIC01. New CPU firmware versions (v2.0.0 and newer) return error when the operation is unsuccessful,
+ * but with older firmwares the operation fails silently. If you use CPU firmware older than v2.0.0, make sure to
+ * manually check whether the I-Config was correctly written if operating outside this range. Refer to datasheet for
+ * absolute maximum ratings.
+ *
+ * @param h           Handle for communication with TROPIC01
+ * @param config      Array into which objects are read
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_write_whole_I_config(lt_handle_t *h, const struct lt_config_t *config);
+
+/**
+ * @brief Establishes a secure channel between host MCU and TROPIC01
+ *
+ * @warning This function currently DOES NOT validate/verify the whole certificate chain, it just parses out STPUB from
+ * the device's certificate, because STPUB is used for handshake.
+ *
+ * To verify the whole certificate chain we recommend to download all certificates from chip by using
+ * lt_get_info_cert_store() and use any apropriate third party tool to verify validity of certificate chain.
+ *
+ * @param h           Handle for communication with TROPIC01
+ * @param shipriv     Host's private pairing key for the slot `pkey_index`
+ * @param shipub      Host's public pairing key for the slot `pkey_index`
+ * @param pkey_index  Pairing key index
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_verify_chip_and_start_secure_session(lt_handle_t *h, const uint8_t *shipriv, const uint8_t *shipub,
+                                                 const lt_pkey_index_t pkey_index);
+
+/**
+ * @brief Prints bytes in hex format to the given output buffer.
+ *
+ * @param   bytes         Bytes to print
+ * @param   bytes_cnt     Number of bytes to print
+ * @param   out_buf       Output buffer to print to
+ * @param   out_buf_size  Size of `out_buf`
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_print_bytes(const uint8_t *bytes, const size_t bytes_cnt, char *out_buf, const size_t out_buf_size);
+
+/**
+ * @brief Interprets fields of CHIP_ID and prints them using the passed printf-like function.
+ *
+ * @param  chip_id     CHIP_ID structure
+ * @param  print_func  printf-like function to use for printing
+ *
+ * @retval            LT_OK Function executed successfully
+ * @retval            other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * of returned value
+ */
+lt_ret_t lt_print_chip_id(const struct lt_chip_id_t *chip_id, int (*print_func)(const char *format, ...));
+
+/**
+ * @brief Prints interpreted firmware header of the given bank using the passed printf-like function.
+ *
+ * @note  Reported git hashes will not match for certain old firmware versions, see documentation for details.
+ *
+ * @param h            Handle for communication with TROPIC01
+ * @param bank_id      Bank ID whose header should be printed
+ * @param print_func   printf-like function to use for printing
+ * @retval             LT_OK if success, otherwise returns other error code.
+ */
+lt_ret_t lt_print_fw_header(lt_handle_t *h, const lt_bank_id_t bank_id, int (*print_func)(const char *format, ...));
+
+/**
+ * @brief Performs mutable firmware update on ABAB and ACAB silicon revisions.
+ *
+ * @param h                 Handle for communication with TROPIC01
+ * @param update_data       Pointer to the data to be written
+ * @param update_data_size  Size of the data to be written
+ * @param bank_id           Bank ID where the update should be applied, valid values are
+ *                             For ABAB: TR01_FW_BANK_FW1, TR01_FW_BANK_FW2, TR01_FW_BANK_SPECT1, TR01_FW_BANK_SPECT2
+ *                             For ACAB: Parameter is ignored, chip is handling firmware banks on its own
+ * @return                  LT_OK if success, otherwise returns other error code.
+ */
+lt_ret_t lt_do_mutable_fw_update(lt_handle_t *h, const uint8_t *update_data, const uint16_t update_data_size,
+                                 const lt_bank_id_t bank_id);
+
+/** @} */  // end of libtropic_API_helpers group
+#endif
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif  // LT_LIBTROPIC_H
