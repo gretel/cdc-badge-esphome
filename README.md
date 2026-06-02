@@ -1,5 +1,9 @@
 # CDC Badge — ESPHome
 
+ESPHome firmware for the [CDC Badge](https://github.com/riatlabs/cdc-badge).
+
+<img width="1024" height="1365" alt="cdc-badge-esphome" src="https://github.com/user-attachments/assets/1249e9eb-ff1c-4400-a7cd-7d89faf2daba" />
+
 ## Quickstart
 
 ### Prerequisites
@@ -40,10 +44,6 @@ cp secrets.yaml.example secrets.yaml
 Single-badge auto-detect: `./flash.sh` (no port arg).
 
 After flash the badge resets automatically. First boot ~30s for filesystem init. If display stays blank, press **RESET**.
-
-ESPHome firmware for the [CDC Badge](https://github.com/riatlabs/cdc-badge).
-
-<img width="1024" height="1365" alt="cdc-badge-esphome" src="https://github.com/user-attachments/assets/1249e9eb-ff1c-4400-a7cd-7d89faf2daba" />
 
 ## Hardware
 
