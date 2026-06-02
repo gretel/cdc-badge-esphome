@@ -8,8 +8,10 @@ ESPHome firmware for the [CDC Badge](https://github.com/riatlabs/cdc-badge).
 
 ### Prerequisites
 
-- CDC Badge hardware + USB-C cable
-- Python 3.9+ ([uv](https://docs.astral.sh/uv/) or pip)
+- CDC Badge hardware
+- USB-C cable
+- Python 3.9+
+- [`uv`](https://docs.astral.sh/uv/getting-started/installation/) or `pip`
 
 ### Get the firmware
 
@@ -24,14 +26,13 @@ cd cdc-badge-esphome
 uv tool install esphome
 ```
 
-Or via pip: `pip install esphome`. See [esphome.io/guides/installing_esphome](https://esphome.io/guides/installing_esphome/) for other options.
-
 ### Configure
 
 ```bash
 cp secrets.yaml.example secrets.yaml
-# Then edit secrets.yaml with your WiFi credentials and Home Assistant API key
 ```
+
+Now edit `secrets.yaml` with your WiFi credentials and Home Assistant [API key](https://esphome.io/components/api/).
 
 ### Flash
 
@@ -41,9 +42,7 @@ cp secrets.yaml.example secrets.yaml
 ./flash.sh
 ```
 
-Auto-detects the badge. For multiple devices: `./flash.sh /dev/cu.usbmodemXXXX`.
-
-After flash the badge resets automatically. If display stays blank, press **RESET**.
+Auto-detects the badge and flashes.
 
 ## Hardware
 
