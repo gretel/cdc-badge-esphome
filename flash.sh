@@ -43,4 +43,4 @@ esptool --chip esp32s3 \
     0x9000 ota_data_initial.bin \
     0x10000 firmware.bin
 
-echo "=== Done. Power-cycle the badge (unplug/replug USB) ==="
+echo "=== Done. Badge resets automatically. If it doesn't boot, press RESET. ==="

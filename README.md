@@ -57,7 +57,7 @@ cp secrets.yaml.example secrets.yaml  # edit with your WiFi credentials
 ./flash.sh /dev/cu.usbmodemXXXX
 ```
 
-After flash, **power-cycle** the badge (unplug/replug USB) — RTS reset leaves chip in download mode.
+After flash the badge resets automatically. If it doesn't boot, press the **RESET** button.
 
 ## API (Home Assistant)
 
