@@ -26,13 +26,21 @@ cd cdc-badge-esphome
 uv tool install esphome
 ```
 
+### Generate API Key
+ 
+* The ESPHome documentation has a [key generator](https://esphome.io/components/api/#configuration-variables).
+* Advanced users may considers using [`esphome-keymaker`](https://github.com/rpezzotti/esphome-keymaker).
+
 ### Configure
 
 ```bash
 cp secrets.yaml.example secrets.yaml
 ```
 
-Now edit `secrets.yaml` with your WiFi credentials and Home Assistant [API key](https://esphome.io/components/api/).
+Now edit `secrets.yaml` with your
+- WiFi credentials
+- Home Assistant API Key
+- OTA Key (random string or password)
 
 ### Flash
 
