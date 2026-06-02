@@ -38,12 +38,12 @@ cp secrets.yaml.example secrets.yaml
 > **Note:** ESP-IDF CMake outputs `firmware.bin` but ESPHome expects `<project-name>.bin`. `flash.sh` handles this.
 
 ```bash
-./flash.sh /dev/cu.usbmodemXXXX
+./flash.sh
 ```
 
-Single-badge auto-detect: `./flash.sh` (no port arg).
+Auto-detects the badge. For multiple devices: `./flash.sh /dev/cu.usbmodemXXXX`.
 
-After flash the badge resets automatically. First boot ~30s for filesystem init. If display stays blank, press **RESET**.
+After flash the badge resets automatically. If display stays blank, press **RESET**.
 
 ## Hardware
 
