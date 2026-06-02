@@ -1,0 +1,90 @@
+# ── Home Assistant API ─────────────────────────────────────────
+# Encrypted, persistent connection.  Services are callable from HA automations.
+api:
+  reboot_timeout: 0s          # never reboot just because HA went away
+  encryption:
+    key: !secret hass_key
+  services:
+
+    # Push a message to the badge display + blink backlight for 5 seconds
+    - service: notify
+      variables:
+        message: string
+      then:
+        # Step 1: write the message string into the notif_msg text_sensor
+        # Step 2: force e-paper to redraw (display lambda reads notif_msg)
+        - lambda: |-
+            std::string msg(message.c_str());           // copy HA string
+            id(notif_msg).publish_state(msg);            // publish to sensor
+            id(badge_display)->update();                 // force e‑paper refresh
+        - light.turn_on: epd_backlight
+        - delay: 5s
+        - light.turn_off: epd_backlight
+
+    # Visual attention signal (backlight blink, no screen change)
+    - service: blink_display
+      then:
+        - light.turn_on:
+            id: epd_backlight
+            effect: Blink
+        - delay: 1s
+        - light.turn_off:
+            id: epd_backlight
+        - delay: 500ms
+        - light.turn_on:
+            id: epd_backlight
+            brightness: 1
+
+    # ── TROPIC01 R-Memory storage services ──────────────────────
+    # Each slot is a 512‑byte persistent region inside the secure element.
+
+    # Write arbitrary bytes into a slot
+    - service: se_write
+      variables:
+        slot: int
+        data: string
+      then:
+        # Convert the HA string into a raw byte buffer, write to chip.
+        - lambda: |-
+            {
+              std::string d = data;
+              id(tr01)->r_mem_write(
+                (uint16_t)slot,
+                (const uint8_t *)d.data(), d.size());
+            }
+
+    # Read a slot → publish content to the se_r_mem_value text sensor
+    - service: se_read
+      variables:
+        slot: int
+      then:
+        # The chip fills an internal buffer; we copy it out to a text_sensor
+        # so Home Assistant can display or log the content.
+        - lambda: |-
+            uint16_t read_len = 0;
+            id(tr01)->r_mem_read((uint16_t)slot, read_len);
+            if (read_len > 0) {
+              id(se_r_mem_value).publish_state(
+                std::string((const char *)id(tr01)->r_mem_buf(), read_len));
+            } else {
+              id(se_r_mem_value).publish_state("(empty)");
+            }
+
+    # Zero out a slot
+    - service: se_erase
+      variables:
+        slot: int
+      then:
+        - lambda: "id(tr01)->r_mem_erase((uint16_t)slot);"
+
+# ── Over‑the‑air updates ─────────────────────────────────────
+ota:
+  platform: esphome
+  password: !secret ota_key
+
+# ── Safe mode ─────────────────────────────────────────────────
+# If the badge fails to boot 3 times in a row, stays in safe mode
+# (OTA-only, no custom config) for 10 min so you can fix it.
+safe_mode:
+  num_attempts: 3
+  reboot_timeout: 10min

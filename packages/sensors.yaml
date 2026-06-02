@@ -1,0 +1,311 @@
+# ── ALL sensors: text_sensor, sensor, binary_sensor ───────────
+# Everything that reads or reports data lives here.
+# Sensors are grouped by source: ESPHome built-ins, bq25895, template-derived.
+
+text_sensor:
+  # Firmware version (set via project_version substitution)
+  - platform: version
+    id: badge_version
+    name: "Version"
+    icon: "mdi:exponent-box"
+
+  # WiFi connection info (populated automatically when connected)
+  - platform: wifi_info
+    ip_address:
+      id: ip_addr
+      icon: "mdi:counter"
+      name: "IP Address"
+    ssid:
+      id: wifi_ssid
+      name: "SSID"
+
+  # BQ25895 charger status (verbose strings from the chip, abbreviated on screen)
+  - platform: bq25895
+    bq25895_id: badge_charger
+    charge_status:
+      id: charge_status
+      name: "Charge Status"
+      on_value:
+        then:
+          - script.execute: refresh_display   # update screen when charge state changes
+    bus_status:
+      id: usb_bus_status
+      name: "USB Bus Status"
+      on_value:
+        then:
+          - script.execute: refresh_display
+
+  # TROPIC01 R-Memory read result (set by the se_read API service)
+  - platform: template
+    id: se_r_mem_value
+    name: "SE R-Memory Value"
+
+  # Notification message — set from HA via the "notify" API service
+  - platform: template
+    id: notif_msg
+    name: "Badge Notification"
+    update_interval: never               # only changes when the API service writes it
+    on_value:
+      then:
+        # New notification arrived → force e-paper redraw to show the message
+        - lambda: "id(badge_display)->update();"
+
+sensor:
+  # ── BQ25895 charger measurements ────────────────────────────
+  - platform: bq25895
+    bq25895_id: badge_charger
+    battery_voltage:
+      id: batt_voltage
+      name: "Battery Voltage"
+    vbus_voltage:
+      id: usb_voltage
+      name: "USB Voltage"
+    charge_current:
+      id: charge_current
+      name: "Charge Current"
+      on_value:
+        then:
+          - script.execute: refresh_display   # refresh when current changes (plug/unplug)
+
+  # ── Chip health ────────────────────────────────────────────
+  - platform: internal_temperature
+    id: core_temp
+    name: "Core Temperature"
+    update_interval: 60s
+
+  - platform: uptime
+    id: badge_uptime
+    name: "Uptime"
+    update_interval: 60s
+    icon: "mdi:clock-start"
+
+  # ── WiFi signal ────────────────────────────────────────────
+  - platform: wifi_signal
+    id: wifi_sig
+    name: "WiFi Signal"
+    update_interval: 30s
+    icon: "mdi:wifi"
+
+  # Same RSSI value but converted to a user-friendly 0-100% percentage
+  - platform: copy
+    id: wifi_strength
+    source_id: wifi_sig
+    name: "WiFi Strength"
+    filters:
+      # Formula: 2 × (dBm + 100), clamped to [0, 100]
+      # At −100 dBm → 0%, at −50 dBm → 100%
+      - lambda: return min(max(2 * (x + 100.0), 0.0), 100.0);
+    unit_of_measurement: "%"
+    entity_category: "diagnostic"
+
+  # ── Derived battery metrics ────────────────────────────────
+  # Battery Level: LiPo voltage (3.0-4.2V) mapped to 0-100%
+  - platform: template
+    id: battery_pct
+    name: "Battery Level"
+    unit_of_measurement: "%"
+    update_interval: 30s
+    lambda: |-
+      if (!id(batt_voltage).has_state()) return NAN;   // no charger data yet → undefined
+      float v = id(batt_voltage).state;
+      // LiPo discharge curve: 3.0 V = flat (0%), 4.2 V = full (100%)
+      float pct = (v - 3.0) / 1.2 * 100.0;
+      if (pct < 0) pct = 0;
+      if (pct > 100) pct = 100;
+      return pct;
+    icon: "mdi:battery"
+
+  # Estimated remaining hours (rough): capacity × voltage fraction ÷ avg draw
+  - platform: template
+    id: battery_runtime
+    name: "Battery Runtime"
+    unit_of_measurement: "h"
+    update_interval: 60s
+    lambda: |-
+      if (!id(batt_voltage).has_state()) return NAN;
+      float v = id(batt_voltage).state;
+      float pct = (v - 3.0) / 1.2;              // 0.0 … 1.0 from voltage
+      if (pct < 0) pct = 0;
+      if (pct > 1) pct = 1;
+      // 1200 mAh battery, ~200 mA average draw → ~6h at full charge
+      return pct * 1200.0 / 200.0;
+    icon: "mdi:battery-clock"
+
+binary_sensor:
+  # HA connectivity (COM vs DISCONNECTED)
+  - platform: status
+    name: "Status"
+
+  # USB cable presence (from BQ25895 VBUS detection)
+  - platform: bq25895
+    bq25895_id: badge_charger
+    vbus_connected:
+      id: charger_vbus
+
+  # ── Keypad (12 keys via TCA9535 IO expander at I²C 0x20) ───
+  # Each key maps to one GPIO on the xl9535.  Inputs are pulled HIGH internally
+  # and driven LOW on press, so inverted=true makes pressed → true.
+  # On any state change the display refreshes to show the updated status.
+  # Keys 0-7 → xl9535 pins 0-7, Keys 8-9 → pins 10-11, YES/NO → pins 12-13.
+  - platform: gpio
+    id: key_0
+    name: "Key 0"
+    pin:
+      xl9535: keypad_expander
+      number: 0
+      mode: INPUT
+      inverted: true
+    on_state:
+      then:
+        - script.execute: refresh_display
+  # Keys 1–9 follow the same pattern: incrementing xl9535 pin number
+  - platform: gpio
+    id: key_1
+    name: "Key 1"
+    pin:
+      xl9535: keypad_expander
+      number: 1
+      mode: INPUT
+      inverted: true
+    on_state:
+      then:
+        - script.execute: refresh_display
+  - platform: gpio
+    id: key_2
+    name: "Key 2"
+    pin:
+      xl9535: keypad_expander
+      number: 2
+      mode: INPUT
+      inverted: true
+    on_state:
+      then:
+        - script.execute: refresh_display
+  - platform: gpio
+    id: key_3
+    name: "Key 3"
+    pin:
+      xl9535: keypad_expander
+      number: 3
+      mode: INPUT
+      inverted: true
+    on_state:
+      then:
+        - script.execute: refresh_display
+  - platform: gpio
+    id: key_4
+    name: "Key 4"
+    pin:
+      xl9535: keypad_expander
+      number: 4
+      mode: INPUT
+      inverted: true
+    on_state:
+      then:
+        - script.execute: refresh_display
+  - platform: gpio
+    id: key_5
+    name: "Key 5"
+    pin:
+      xl9535: keypad_expander
+      number: 5
+      mode: INPUT
+      inverted: true
+    on_state:
+      then:
+        - script.execute: refresh_display
+  - platform: gpio
+    id: key_6
+    name: "Key 6"
+    pin:
+      xl9535: keypad_expander
+      number: 6
+      mode: INPUT
+      inverted: true
+    on_state:
+      then:
+        - script.execute: refresh_display
+  - platform: gpio
+    id: key_7
+    name: "Key 7"
+    pin:
+      xl9535: keypad_expander
+      number: 7
+      mode: INPUT
+      inverted: true
+    on_state:
+      then:
+        - script.execute: refresh_display
+  # Key 8-9: pin numbers skip to 10-11 (xl9535 has extra IO on upper pins)
+  - platform: gpio
+    id: key_8
+    name: "Key 8"
+    pin:
+      xl9535: keypad_expander
+      number: 10
+      mode: INPUT
+      inverted: true
+    on_state:
+      then:
+        - script.execute: refresh_display
+  - platform: gpio
+    id: key_9
+    name: "Key 9"
+    pin:
+      xl9535: keypad_expander
+      number: 11
+      mode: INPUT
+      inverted: true
+    on_state:
+      then:
+        - script.execute: refresh_display
+  - platform: gpio
+    id: key_yes
+    name: "Key YES"
+    pin:
+      xl9535: keypad_expander
+      number: 12
+      mode: INPUT
+      inverted: true
+    on_state:
+      then:
+        - script.execute: refresh_display
+  - platform: gpio
+    id: key_no
+    name: "Key NO"
+    pin:
+      xl9535: keypad_expander
+      number: 13
+      mode: INPUT
+      inverted: true
+    on_state:
+      then:
+        - script.execute: refresh_display
+
+  # ── Grove motion sensor (GPIO2, PIR) ────────────────────────
+  # GPIO2 is a bare input with no external pull.  Debounce filters suppress
+  # electrical noise on the floating line.
+  - platform: gpio
+    id: pir_motion
+    name: "Motion"
+    device_class: motion
+    pin:
+      number: GPIO2
+      mode: INPUT
+    filters:
+      - delayed_on: 20ms     # signal must be stable HIGH for 20ms before triggering
+      - delayed_off: 20ms    # same for falling edge
+    on_state:
+      then:
+        - script.execute: refresh_display
+
+  # ── Flash / BOOT button (GPIO0) ────────────────────────────
+  # Also acts as ESP32 strapping pin (pulled LOW at boot enters download mode).
+  # We use INPUT_PULLUP so the button reads HIGH when released, LOW when pressed.
+  - platform: gpio
+    id: flash_button
+    pin:
+      number: GPIO0
+      inverted: true
+      mode: INPUT_PULLUP
+    name: "Flash Button"

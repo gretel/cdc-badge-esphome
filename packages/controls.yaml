@@ -1,0 +1,79 @@
+# ── SAO expansion port (GPIO15 = IO1, GPIO16 = IO2) ──────────
+# Controlled via Home Assistant switches.  Default ON.
+switch:
+  - platform: gpio
+    id: sao_gpio1
+    name: "SAO IO1"
+    pin: GPIO15
+    restore_mode: RESTORE_DEFAULT_ON
+    on_turn_on:
+      then:
+        - script.execute: refresh_display    # update screen to show new state
+    on_turn_off:
+      then:
+        - script.execute: refresh_display
+  - platform: gpio
+    id: sao_gpio2
+    name: "SAO IO2"
+    pin: GPIO16
+    restore_mode: RESTORE_DEFAULT_ON
+    on_turn_on:
+      then:
+        - script.execute: refresh_display
+    on_turn_off:
+      then:
+        - script.execute: refresh_display
+
+# ── Action buttons ────────────────────────────────────────────
+button:
+  # Reboot the ESP32 (soft restart, no flash erase)
+  - platform: restart
+    id: reboot_btn
+    name: "Restart"
+    icon: "mdi:restart"
+    entity_category: "config"
+
+  # Boot into safe mode (OTA-only, skip custom config)
+  - platform: safe_mode
+    id: safe_mode_btn
+    name: "Safe Mode Boot"
+    entity_category: "config"
+
+  # Enter deep sleep: show sleep screen → cut power → wake on any key press
+  - platform: template
+    id: sleep_btn
+    name: "Deep Sleep"
+    icon: "mdi:sleep"
+    entity_category: "config"
+    on_press:
+      then:
+        # 1. Mark badge as sleeping + record wall-clock time (for the sleep screen)
+        - lambda: |-
+            id(sleep_mode) = true;
+            id(sleep_since) = id(homeassistant_time).now().timestamp;
+        # 2. Stop the periodic display loop so it doesn't fight the sleep screen
+        - script.stop: display_loop
+        # 3. Force a final redraw → e-paper shows "Sleeping…" message
+        - lambda: "id(badge_display)->update();"
+        # 4. Wait for the slow e-paper to finish its refresh cycle
+        - delay: 2s
+        # 5. Kill the backlight so it's not lit during sleep
+        - light.turn_off: epd_backlight
+        - delay: 200ms
+        # 6. Clear any pending interrupt on the TCA9535 IO expander,
+        #    otherwise the first key press after wake only clears the latch
+        #    and doesn't actually wake the chip.
+        - lambda: |-
+            { uint8_t v; id(keypad_expander)->read_byte(0x00, &v); id(keypad_expander)->read_byte(0x01, &v); }
+        # 7. Enter deep sleep — GPIO1 (EXP_IRQ) is configured as wake pin
+        - deep_sleep.enter
+
+  # Force a display refresh (increments R:N counter on screen)
+  - platform: template
+    id: refresh_btn
+    name: "Refresh Display"
+    icon: "mdi:refresh"
+    entity_category: "config"
+    on_press:
+      then:
+        - script.execute: refresh_display

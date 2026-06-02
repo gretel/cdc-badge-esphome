@@ -1,0 +1,52 @@
+# ── I²C Bus 0 (BQ25895 charger + TCA9535 keypad + SAO EEPROM) ─
+i2c:
+  - id: i2c0
+    sda: GPIO17
+    scl: GPIO18
+    frequency: 100kHz
+    #scan: true              # log detected devices at startup for debugging
+
+# ── BQ25895 charger driver ─────────────────────────────────────
+# Custom component — see components/bq25895/.  Replaces built‑in sy6970
+# because that component uses one‑shot ADC mode which gives stale readings.
+# This one keeps continuous ADC on so voltage/current sensors are always fresh.
+bq25895:
+  id: badge_charger
+  i2c_id: i2c0
+  address: 0x6A
+  charge_current: 1024       # fast‑charge current in mA (0-5056)
+  charge_voltage: 4208       # target battery voltage in mV (3840-4608)
+  input_current_limit: 500   # max mA drawn from USB port (100-3200)
+  precharge_current: 128     # pre‑charge current for deeply depleted cells
+  charge_enabled: true
+  enable_status_led: false   # badge has no STATUS pin connected
+  enable_adc: true           # continuous ADC readout for sensors
+  update_interval: 30s
+
+# ── TCA9535 keypad IO expander ────────────────────────────────
+# Register‑identical to the xl9535 driver already in ESPHome.
+xl9535:
+  - id: keypad_expander
+    i2c_id: i2c0
+    address: 0x20
+
+# ── Deep sleep ─────────────────────────────────────────────────
+# Wake on GPIO1 falling edge (EXP_IRQ from TCA9535 → any key press wakes).
+# The badge enters deep sleep via the "Deep Sleep" button in controls.yaml.
+deep_sleep:
+  id: badge_deep_sleep
+  wakeup_pin:
+    number: GPIO1
+    inverted: true
+    mode: INPUT_PULLUP
+
+# ── Sleep-state globals (read by display lambda, set by sleep button) ─
+globals:
+  - id: sleep_mode           # true = badge is in deep-sleep screen
+    type: bool
+    initial_value: "false"
+    restore_value: no        # always boot awake
+  - id: sleep_since          # Unix timestamp of when sleep was entered
+    type: int
+    initial_value: "0"
+    restore_value: no

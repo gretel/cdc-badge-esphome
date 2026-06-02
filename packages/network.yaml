@@ -1,0 +1,37 @@
+# ── WiFi ───────────────────────────────────────────────────────
+# Fallback chain:
+#   1. Try configured SSID from secrets.yaml
+#   2. If that fails → start "CDC Badge" AP + captive portal
+#   3. Improv over BLE works in parallel (flash button to authorise)
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_pass
+  fast_connect: on          # skip full 802.11 scan, connect to strongest known AP
+  # Fallback AP — visible when the client WiFi is unreachable
+  ap:
+    ssid: "CDC Badge"
+    password: !secret wifi_ap_pass
+
+# ── Captive portal (DNS redirect → config page on fallback AP) ─
+captive_portal:
+
+# ── Web server (local HTTP) ───────────────────────────────────
+web_server:
+  port: 80
+  version: 3
+  local: true               # only reachable on LAN, not exposed to internet
+  ota: false                # OTA updates happen via ESPHome API, not HTTP
+
+# ── Time sync ─────────────────────────────────────────────────
+# Receives wall-clock time from Home Assistant via the API connection.
+time:
+  - platform: homeassistant
+    id: homeassistant_time   # used by the display lambda to show HH:MM in header
+
+# ── BLE radio (required by Improv) ───────────────────────────
+esp32_ble:
+
+# ── ESPHome Improv (Wi‑Fi provisioning over BLE) ─────────────
+# Press the flash button to authorise a new device to send Wi‑Fi credentials.
+esp32_improv:
+  authorizer: flash_button

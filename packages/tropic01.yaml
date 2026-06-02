@@ -1,0 +1,26 @@
+# ── TROPIC01 Secure Element ────────────────────────────────────
+# SPI secure element (TROPIC01) with firmware version info,
+# tamper detection, and R-Memory read/write/erase.
+#
+# Custom component — see components/tropic01/. Uses ESP-IDF SPI directly
+# (shared bus with e-paper, not ESPHome's SPI component).
+# The sub-entries below auto-create text_sensor / binary_sensor entities.
+tropic01:
+  id: tr01
+  cs_pin: 10
+  data_rate: 10000000        # 10 MHz SPI clock
+  chip_mode:
+    id: tr01_chip_mode
+    name: "TROPIC01 Chip Mode"     # current operating mode of the secure element
+  fw_version_riscv:
+    id: tr01_fw_rv
+    name: "TROPIC01 RISC-V Version"     # firmware version running on the RISC-V core
+  fw_version_spect:
+    id: tr01_fw_spect
+    name: "TROPIC01 SPECT Version"      # SPECT = security coprocessor (crypto hardware) firmware version
+  chip_serial:
+    id: tr01_serial
+    name: "TROPIC01 Serial"        # unique factory-programmed chip serial
+  alarm:
+    id: tr01_alarm
+    name: "TROPIC01 Tamper Alarm"  # true if the chip detects physical tampering

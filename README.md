@@ -60,7 +60,7 @@ Auto-detects the badge and flashes.
 | TROPIC01 secure element | SPI | GPIO10 CS | `components/tropic01/` (custom) |
 | GDEY029T94 e-paper (SSD1680) | SPI | GPIO41/45/46/42 | `epaper_spi` |
 | TCA9535 keypad expander | I2C | 0x20 | `xl9535` |
-| PIR motion | GPIO | GPIO2 | `gpio` binary sensor |
+| Grove signal | GPIO | GPIO2 | `gpio` binary sensor |
 | SAO expansion | GPIO | GPIO15/16 | `gpio` switch |
 | Backlight | PWM | GPIO8 | `ledc` output |
 
@@ -74,7 +74,9 @@ Auto-detects the badge and flashes.
 | EPD Backlight | GPIO8 |
 | TROPIC01 CS | GPIO10 |
 | SAO IO1 / IO2 | GPIO15 / 16 |
-| PIR / FLASH / WAKE | GPIO2 / 0 / 1 |
+| Grove (GPIO2) / FLASH / WAKE | GPIO2 / 0 / 1 |
+
+> **Grove switch wiring:** GPIO2 is a bare GPIO — no external pull resistor. The firmware uses `INPUT` mode with debounce filters (`delayed_on: 5ms`, `delayed_off: 200ms`) to suppress noise on the floating pin. Connect switch between **Pin 2 (3.3V)** and **Pin 3 (GPIO2)** — not GND. Press = HIGH = Active.
 
 ### I2C bus
 
@@ -126,7 +128,7 @@ Auto-detects the badge and flashes.
 | Status (connectivity) | — | ESPHome |
 | Key 0-9 | `key_0`..`key_9` | TCA9535 |
 | Key YES / NO | `key_yes` / `key_no` | TCA9535 |
-| Motion | `pir_motion` | PIR (GPIO2) |
+| Motion | `pir_motion` | Grove port (GPIO2) |
 | Flash Button | `flash_button` | GPIO0 |
 | VBUS Connected | `charger_vbus` | BQ25895 |
 
@@ -145,10 +147,22 @@ Auto-detects the badge and flashes.
 | ------ | -- | ----- | ------- |
 | Display Update Interval | `display_update_interval` | 5-3600s | 60s |
 
-## External components
+## Reusable components
 
-| Component | What it does |
-| --------- | ------------ |
-| `components/bq25895/` | BQ25895 charger driver — reads battery voltage, charge current, bus voltage. Forked from ESPHome's sy6970 with a fix for continuous ADC mode (the original used one-shot mode which caused stale battery readings). |
-| `components/tropic01/` | TROPIC01 secure element driver — SPI communication with the security chip. Exposes firmware versions, tamper status, chip serial number, and R-Memory read/write/erase. Built on libtropic + mbedTLS. |
+This repo provides two reusable [external_components](https://esphome.io/components/external_components/):
 
+| Component | Bus | Description |
+|-----------|-----|-------------|
+| `bq25895` | I²C | Battery charger driver (sensor, text_sensor, binary_sensor) |
+| `tropic01` | SPI | Secure element driver (R-Memory, tamper, FW version) |
+
+See [`components/README.md`](components/README.md) for config schemas, usage examples, and API docs.
+
+```yaml
+external_components:
+  - source:
+      type: git
+      url: https://github.com/gretel/cdc-badge-esphome
+      ref: main
+    components: [bq25895, tropic01]
+```
