@@ -6,7 +6,7 @@ substitutions:
   device_name: cdc-badge
   friendly_name: CDC Badge
   project_name: "riat.at"
-  project_version: "0.1.1"
+  project_version: "0.1.2"
   device_area: "Bootcamp"
 
   # Pin substitutions — change once if reusing this firmware on a different board
@@ -73,6 +73,7 @@ esp32:
   board: esp32-s3-devkitc1-n16r8
   variant: ESP32S3
   flash_size: 16MB
+  #toolchain: esp-idf
   framework:
     type: esp-idf
     # ESP-IDF advanced tuning — these reduce binary size and free IRAM
@@ -100,10 +101,11 @@ external_components:
 
 # ── Logging (via USB-Serial/JTAG, reduce I²C noise) ─────────────
 logger:
-  level: DEBUG
+  level: INFO
   hardware_uart: USB_SERIAL_JTAG     # USB-C data pins, no separate UART needed
   logs:
     i2c.idf: WARN                    # suppress noisy I²C driver-level logs
+    script: ERROR
     epaper_spi: INFO
 
 # ── Packages ──────────────────────────────────────────────────

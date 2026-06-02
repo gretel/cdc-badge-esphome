@@ -7,9 +7,12 @@ wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_pass
   fast_connect: on          # skip full 802.11 scan, connect to strongest known AP
+  reboot_timeout: 0s
+  use_psram: true
   # Fallback AP — visible when the client WiFi is unreachable
   ap:
-    ssid: "CDC Badge"
+    ap_timeout: 60s
+    ssid: !secret wifi_ap_ssid
     password: !secret wifi_ap_pass
 
 # ── Captive portal (DNS redirect → config page on fallback AP) ─
@@ -30,6 +33,7 @@ time:
 
 # ── BLE radio (required by Improv) ───────────────────────────
 esp32_ble:
+  use_psram: true
 
 # ── ESPHome Improv (Wi‑Fi provisioning over BLE) ─────────────
 # Press the flash button to authorise a new device to send Wi‑Fi credentials.

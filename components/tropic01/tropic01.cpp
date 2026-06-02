@@ -2,6 +2,10 @@
 #include "libtropic.h"
 #include "libtropic_common.h"
 #include "libtropic_mbedtls_v4.h"
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wredundant-decls"
+#include "psa/crypto.h"
+#pragma GCC diagnostic pop
 #include "esphome/core/log.h"
 #include "driver/spi_master.h"
 #include "driver/gpio.h"
@@ -62,6 +66,17 @@ bool Tropic01Component::init_tropic() {
   // Allocate crypto context (mbedTLS v4 CAL) — lt_init needs this
   handle_->l3.crypto_ctx = new lt_ctx_mbedtls_v4_t{};
   std::memset(handle_->l3.crypto_ctx, 0, sizeof(lt_ctx_mbedtls_v4_t));
+
+  // Initialise mbedTLS PSA Crypto API — required before any hash/AES operations
+  psa_status_t psa_ret = psa_crypto_init();
+  if (psa_ret != PSA_SUCCESS) {
+    ESP_LOGE(TAG, "psa_crypto_init failed: %d", (int)psa_ret);
+    delete static_cast<lt_ctx_mbedtls_v4_t *>(handle_->l3.crypto_ctx);
+    delete dev;
+    delete handle_;
+    handle_ = nullptr;
+    return false;
+  }
 
   lt_ret_t ret = lt_init(handle_);
   if (ret != LT_OK) {

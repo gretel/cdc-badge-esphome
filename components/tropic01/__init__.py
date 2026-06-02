@@ -109,3 +109,6 @@ async def to_code(config):
     cg.add_build_flag("-DLT_LOG_ENABLE_WARN=0")
     cg.add_build_flag("-DLT_LOG_ENABLE_INFO=1")
     cg.add_build_flag("-DLT_LOG_ENABLE_DEBUG=0")
+
+    # Suppress libtropic's intentional #warning about volatile-secure-memzero
+    cg.add_build_flag("-Wno-cpp")

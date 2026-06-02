@@ -21,6 +21,18 @@ light:
               duration: 300ms
             - state: false
               duration: 300ms
+      - pulse:
+          name: "Slow Pulse"
+          transition_length: 2s
+          update_interval: 2s
+          min_brightness: 0
+          max_brightness: 1
+      - pulse:
+          name: "Fast Pulse"
+          transition_length: 500ms
+          update_interval: 500ms
+          min_brightness: 0.2
+          max_brightness: 1
 
 # ── SPI bus (shared by e-paper + TROPIC01 secure element) ────
 spi:
