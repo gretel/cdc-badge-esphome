@@ -40,11 +40,20 @@ ESPHome firmware for the [CDC Badge](https://github.com/riatlabs/cdc-badge).
 
 > **Note:** ESP-IDF CMake hardcodes `firmware.bin` as output, but ESPHome's flash_args expects `<project-name>.bin` (e.g. `cdc-badge.bin`). `flash.sh` handles this automatically.
 
-```bash
-# install esphome, create secrets.yaml (see secrets.yaml.example)
-cp secrets.yaml.example secrets.yaml  # fill in your values
+### Install ESPHome
 
-# one-shot compile + flash
+```bash
+pip install esphome
+# or with uv:
+# uv tool install esphome
+```
+
+See [esphome.io/guides/installing_esphome](https://esphome.io/guides/installing_esphome/) for other options.
+
+### Flash
+
+```bash
+cp secrets.yaml.example secrets.yaml  # edit with your WiFi credentials
 ./flash.sh /dev/cu.usbmodemXXXX
 ```
 
