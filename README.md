@@ -1,5 +1,46 @@
 # CDC Badge — ESPHome
 
+## Quickstart
+
+### Prerequisites
+
+- CDC Badge hardware + USB-C cable
+- Python 3.9+ ([uv](https://docs.astral.sh/uv/) or pip)
+
+### Get the firmware
+
+```bash
+git clone https://github.com/gretel/cdc-badge-esphome.git
+cd cdc-badge-esphome
+```
+
+### Install ESPHome
+
+```bash
+uv tool install esphome
+```
+
+Or via pip: `pip install esphome`. See [esphome.io/guides/installing_esphome](https://esphome.io/guides/installing_esphome/) for other options.
+
+### Configure
+
+```bash
+cp secrets.yaml.example secrets.yaml
+# Then edit secrets.yaml with your WiFi credentials and Home Assistant API key
+```
+
+### Flash
+
+> **Note:** ESP-IDF CMake outputs `firmware.bin` but ESPHome expects `<project-name>.bin`. `flash.sh` handles this.
+
+```bash
+./flash.sh /dev/cu.usbmodemXXXX
+```
+
+Single-badge auto-detect: `./flash.sh` (no port arg).
+
+After flash the badge resets automatically. First boot ~30s for filesystem init. If display stays blank, press **RESET**.
+
 ESPHome firmware for the [CDC Badge](https://github.com/riatlabs/cdc-badge).
 
 <img width="1024" height="1365" alt="cdc-badge-esphome" src="https://github.com/user-attachments/assets/1249e9eb-ff1c-4400-a7cd-7d89faf2daba" />
@@ -36,28 +77,7 @@ ESPHome firmware for the [CDC Badge](https://github.com/riatlabs/cdc-badge).
 | 0x50 | SAO EEPROM |
 | 0x6A | BQ25895 charger |
 
-## Quickstart
 
-> **Note:** ESP-IDF CMake hardcodes `firmware.bin` as output, but ESPHome's flash_args expects `<project-name>.bin` (e.g. `cdc-badge.bin`). `flash.sh` handles this automatically.
-
-### Install ESPHome
-
-```bash
-pip install esphome
-# or with uv:
-# uv tool install esphome
-```
-
-See [esphome.io/guides/installing_esphome](https://esphome.io/guides/installing_esphome/) for other options.
-
-### Flash
-
-```bash
-cp secrets.yaml.example secrets.yaml  # edit with your WiFi credentials
-./flash.sh /dev/cu.usbmodemXXXX
-```
-
-After flash the badge resets automatically. If it doesn't boot, press the **RESET** button.
 
 ## API (Home Assistant)
 
