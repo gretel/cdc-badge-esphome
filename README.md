@@ -38,15 +38,17 @@ ESPHome firmware for the [CDC Badge](https://github.com/riatlabs/cdc-badge).
 
 ## Quickstart
 
+> **Note:** ESP-IDF CMake hardcodes `firmware.bin` as output, but ESPHome's flash_args expects `<project-name>.bin` (e.g. `cdc-badge.bin`). `flash.sh` handles this automatically.
+
 ```bash
-# install esphome, create secrets.yaml
-esphome run cdc-badge.yaml
+# install esphome, create secrets.yaml (see secrets.yaml.example)
+cp secrets.yaml.example secrets.yaml  # fill in your values
+
+# one-shot compile + flash
+./flash.sh /dev/cu.usbmodemXXXX
 ```
 
-
-Copy `secrets.yaml.example` to `secrets.yaml` and fill in your values.
-
-Hold **BOOT**, tap **RESET**, release **BOOT** → download mode.
+After flash, **power-cycle** the badge (unplug/replug USB) — RTS reset leaves chip in download mode.
 
 ## API (Home Assistant)
 
