@@ -44,8 +44,6 @@ Now edit `secrets.yaml` with your
 
 ### Flash
 
-> **Note:** ESP-IDF CMake outputs `firmware.bin` but ESPHome expects `<project-name>.bin`. `flash.sh` handles this.
-
 ```bash
 ./flash.sh
 ```
