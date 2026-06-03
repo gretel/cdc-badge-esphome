@@ -153,7 +153,7 @@ Install via **HACS** ([add repository](https://my.home-assistant.io/redirect/hac
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=gretel&repository=cdc-badge-esphome&category=plugin)
 
-Or manually copy `cdc-badge-card.js` to `<config>/www/` and add a resource `/local/cdc-badge-card.js` (type: JavaScript Module).
+Or manually copy `cdc-badge-esphome.js` to `<config>/www/` and add a resource `/local/cdc-badge-esphome.js` (type: JavaScript Module).
 
 See [`ha-card/README.md`](ha-card/README.md) for full configuration reference.
 

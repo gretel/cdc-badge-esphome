@@ -16,12 +16,12 @@ Or add manually: **HACS → Integrations → Custom repositories** → URL: `htt
 
 ### Manual
 
-1. Copy `cdc-badge-card.js` from the [repo root](https://github.com/gretel/cdc-badge-esphome/blob/main/cdc-badge-card.js) to your HA `config/www/` directory.
+1. Copy `cdc-badge-esphome.js` from the [repo root](https://github.com/gretel/cdc-badge-esphome/blob/main/cdc-badge-esphome.js) to your HA `config/www/` directory.
 
 2. Add a resource in your dashboard config:
 
    **Settings → Dashboards → Resources → Add resource**
-   - URL: `/local/cdc-badge-card.js`
+   - URL: `/local/cdc-badge-esphome.js`
    - Type: `JavaScript Module`
 
 3. Add the card to any dashboard:

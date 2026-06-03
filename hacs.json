@@ -1,6 +1,6 @@
 {
   "name": "CDC Badge Card",
-  "filename": "cdc-badge-card.js",
+  "filename": "cdc-badge-esphome.js",
   "content_in_root": true,
   "render_readme": true,
   "homeassistant": "2024.1.0",
