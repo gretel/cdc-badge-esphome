@@ -141,9 +141,9 @@ class CdcBadgeCard extends LitElement {
     const num = (k) => this._num(k);
     const str = (k) => this._str(k);
 
-    // Entity config shorthand
     const eid = (k) => this.config[k];
-    const connected = (k) => eid(k) && $[eid(k)];
+    // Show row/section if entity_id is configured (state may be absent → "—" placeholder)
+    const cfg = (k) => eid(k) != null && eid(k) !== "";
 
     // Resolve values
     const battPct = num("entity_battery_level");
@@ -165,14 +165,13 @@ class CdcBadgeCard extends LitElement {
     const seFwSp = str("entity_se_fw_spect");
     const intervalVal = num("entity_display_interval") || 60;
 
-    const online = $[eid("entity_status")]?.state === "on" || $[eid("entity_status")]?.state === "home";
     const charging = chargeStr === "Charging" || chargeStr === "Pre-charging";
     const seAlarm = on("entity_se_alarm");
     const motionOn = on("entity_motion");
     const sao1On = on("entity_sao_gpio1");
     const sao2On = on("entity_sao_gpio2");
     const backlightOn = on("entity_backlight");
-    const hasKeypad = connected("key_0") || connected("key_yes");
+    const hasKeypad = cfg("key_0") || cfg("key_yes");
 
     // Charge status display
     const chgMap = { "Charging": "Charging", "Charging Done": "Full", "Discharging": "Discharging", "Not Charging": "Off", "Pre-charging": "Pre-charge" };
@@ -186,8 +185,7 @@ class CdcBadgeCard extends LitElement {
     const battPctStr = battPct != null ? Math.round(battPct) + "%" : "—";
     const iconBatt = charging ? "mdi:lightning-bolt" : battPct != null && battPct < 20 ? "mdi:battery-outline" : "mdi:battery";
 
-    // WiFi
-    const wifiBar = wifiDbm != null ? ((wifiDbm + 100) * 2).toFixed(0) + "%" : "—";
+    // WiFi icon by strength
     const wifiIcon = wifiDbm != null ? (wifiDbm > -60 ? "mdi:wifi-strength-4" : wifiDbm > -70 ? "mdi:wifi-strength-3" : wifiDbm > -80 ? "mdi:wifi-strength-2" : "mdi:wifi-strength-1") : "mdi:wifi-off";
 
     return html`
@@ -210,28 +208,28 @@ class CdcBadgeCard extends LitElement {
           `)}
 
           <!-- NETWORK -->
-          ${connected("entity_ip") || connected("entity_ssid") || connected("entity_wifi_signal")
+          ${cfg("entity_ip") || cfg("entity_ssid") || cfg("entity_wifi_signal")
             ? this._section("mdi:wifi", "Network", html`
-                ${connected("entity_ip") ? this._row("mdi:ip-network", "IP", ipStr) : ""}
-                ${connected("entity_ssid") ? this._row("mdi:access-point", "SSID", ssidStr || "—") : ""}
-                ${connected("entity_wifi_signal") ? this._row(wifiIcon, "Signal", wifiDbm != null ? `${Math.round(wifiDbm)} dBm` : "—") : ""}
+                ${cfg("entity_ip") ? this._row("mdi:ip-network", "IP", ipStr) : ""}
+                ${cfg("entity_ssid") ? this._row("mdi:access-point", "SSID", ssidStr || "—") : ""}
+                ${cfg("entity_wifi_signal") ? this._row(wifiIcon, "Signal", wifiDbm != null ? `${Math.round(wifiDbm)} dBm` : "—") : ""}
               `)
             : ""}
 
           <!-- HARDWARE -->
-          ${connected("entity_core_temp") || connected("entity_motion") || connected("entity_uptime")
+          ${cfg("entity_core_temp") || cfg("entity_motion") || cfg("entity_uptime") || cfg("entity_sao_gpio1") || cfg("entity_sao_gpio2")
             ? this._section("mdi:chip", "Hardware", html`
-                ${connected("entity_core_temp") ? this._row("mdi:thermometer", "Temperature", fmtTemp(tempC)) : ""}
-                ${connected("entity_motion") ? this._row("mdi:motion-sensor", "Motion", html`<span class="${motionOn ? "green" : "dim"}">${motionOn ? "Active" : "Idle"}</span>`) : ""}
-                ${connected("entity_uptime") ? this._row("mdi:clock-outline", "Uptime", fmtUptime(uptimeS)) : ""}
-                ${connected("entity_sao_gpio1") || connected("entity_sao_gpio2")
+                ${cfg("entity_core_temp") ? this._row("mdi:thermometer", "Temperature", fmtTemp(tempC)) : ""}
+                ${cfg("entity_motion") ? this._row("mdi:motion-sensor", "Motion", html`<span class="${motionOn ? "green" : "dim"}">${motionOn ? "Active" : "Idle"}</span>`) : ""}
+                ${cfg("entity_uptime") ? this._row("mdi:clock-outline", "Uptime", fmtUptime(uptimeS)) : ""}
+                ${cfg("entity_sao_gpio1") || cfg("entity_sao_gpio2")
                   ? html`
                       <div class="row">
                         <ha-icon icon="mdi:expansion-card" class="row-icon"></ha-icon>
                         <span class="row-label">SAO</span>
                         <span class="row-value sao-group">
-                          ${connected("entity_sao_gpio1") ? html`<button class="saobtn ${sao1On ? "on" : ""}" @click=${() => this._toggle(eid("entity_sao_gpio1"))}>IO1 ${sao1On ? "ON" : "OFF"}</button>` : ""}
-                          ${connected("entity_sao_gpio2") ? html`<button class="saobtn ${sao2On ? "on" : ""}" @click=${() => this._toggle(eid("entity_sao_gpio2"))}>IO2 ${sao2On ? "ON" : "OFF"}</button>` : ""}
+                          ${cfg("entity_sao_gpio1") ? html`<button class="saobtn ${sao1On ? "on" : ""}" @click=${() => this._toggle(eid("entity_sao_gpio1"))}>IO1 ${sao1On ? "ON" : "OFF"}</button>` : ""}
+                          ${cfg("entity_sao_gpio2") ? html`<button class="saobtn ${sao2On ? "on" : ""}" @click=${() => this._toggle(eid("entity_sao_gpio2"))}>IO2 ${sao2On ? "ON" : "OFF"}</button>` : ""}
                         </span>
                       </div>`
                   : ""}
@@ -239,20 +237,20 @@ class CdcBadgeCard extends LitElement {
             : ""}
 
           <!-- SECURE ELEMENT -->
-          ${connected("entity_se_chip_mode") || connected("entity_se_alarm")
+          ${cfg("entity_se_chip_mode") || cfg("entity_se_alarm") || cfg("entity_se_serial") || cfg("entity_se_fw_rv") || cfg("entity_se_fw_spect")
             ? this._section("mdi:shield-lock", "Secure Element", html`
-                ${connected("entity_se_alarm")
+                ${cfg("entity_se_alarm")
                   ? this._row("mdi:alert-circle-check", "Tamper", html`
                       <span class="${seAlarm ? "red" : "green"}">${seAlarm ? "⚠ Detected" : "✓ Clear"}${seAlarm ? html` <span class="tamper-badge">TAMPER</span>` : ""}</span>`)
                   : ""}
-                ${connected("entity_se_chip_mode") ? this._row("mdi:chip", "Mode", html`<span class="mono">${seMode}</span>`) : ""}
-                ${connected("entity_se_serial") ? this._row("mdi:qrcode", "Serial", html`<span class="mono sm">${seSerial}</span>`) : ""}
-                ${seFwRv || seFwSp
+                ${cfg("entity_se_chip_mode") ? this._row("mdi:chip", "Mode", html`<span class="mono">${seMode}</span>`) : ""}
+                ${cfg("entity_se_serial") ? this._row("mdi:qrcode", "Serial", html`<span class="mono sm">${seSerial}</span>`) : ""}
+                ${cfg("entity_se_fw_rv") || cfg("entity_se_fw_spect")
                   ? html`
                       <details class="fw-details">
                         <summary>Firmware</summary>
-                        ${seFwRv ? this._row("mdi:code-tags", "RISC-V", html`<span class="mono sm">${seFwRv}</span>`) : ""}
-                        ${seFwSp ? this._row("mdi:code-tags", "SPECT", html`<span class="mono sm">${seFwSp}</span>`) : ""}
+                        ${cfg("entity_se_fw_rv") ? this._row("mdi:code-tags", "RISC-V", html`<span class="mono sm">${seFwRv || "—"}</span>`) : ""}
+                        ${cfg("entity_se_fw_spect") ? this._row("mdi:code-tags", "SPECT", html`<span class="mono sm">${seFwSp || "—"}</span>`) : ""}
                       </details>`
                   : ""}
               `)
@@ -262,16 +260,16 @@ class CdcBadgeCard extends LitElement {
           ${hasKeypad ? this._section("mdi:keyboard", "Keypad", this._renderKeys()) : ""}
 
           <!-- ACTIONS -->
-          ${connected("entity_refresh_btn") || connected("entity_sleep_btn") || connected("entity_reboot_btn") || connected("entity_backlight") || connected("entity_display_interval")
+          ${cfg("entity_refresh_btn") || cfg("entity_sleep_btn") || cfg("entity_reboot_btn") || cfg("entity_backlight") || cfg("entity_display_interval")
             ? this._section("mdi:lightning-bolt", "Actions", html`
                 <div class="actions">
-                  ${connected("entity_refresh_btn") ? html`<ha-button unelevated @click=${() => this._press(eid("entity_refresh_btn"))}><ha-icon icon="mdi:refresh" slot="icon"></ha-icon> Refresh</ha-button>` : ""}
-                  ${connected("entity_sleep_btn") ? html`<ha-button unelevated @click=${() => this._press(eid("entity_sleep_btn"))}><ha-icon icon="mdi:sleep" slot="icon"></ha-icon> Sleep</ha-button>` : ""}
-                  ${connected("entity_reboot_btn") ? html`<ha-button unelevated class="red-btn" @click=${() => this._press(eid("entity_reboot_btn"))}><ha-icon icon="mdi:restart" slot="icon"></ha-icon> Restart</ha-button>` : ""}
+                  ${cfg("entity_refresh_btn") ? html`<ha-button unelevated @click=${() => this._press(eid("entity_refresh_btn"))}><ha-icon icon="mdi:refresh" slot="icon"></ha-icon> Refresh</ha-button>` : ""}
+                  ${cfg("entity_sleep_btn") ? html`<ha-button unelevated @click=${() => this._press(eid("entity_sleep_btn"))}><ha-icon icon="mdi:sleep" slot="icon"></ha-icon> Sleep</ha-button>` : ""}
+                  ${cfg("entity_reboot_btn") ? html`<ha-button unelevated class="red-btn" @click=${() => this._press(eid("entity_reboot_btn"))}><ha-icon icon="mdi:restart" slot="icon"></ha-icon> Restart</ha-button>` : ""}
                 </div>
                 <div class="action-options">
-                  ${connected("entity_backlight") ? html`<label><ha-switch ?checked=${backlightOn} @change=${(e) => this._setLight(eid("entity_backlight"), e.target.checked)}></ha-switch> Backlight</label>` : ""}
-                  ${connected("entity_display_interval") ? html`<label><ha-icon icon="mdi:timer-outline"></ha-icon> <select @change=${(e) => this._setNumber(eid("entity_display_interval"), +e.target.value)}>${[15,30,60,120,300,600].map((v) => html`<option value=${v} ?selected=${intervalVal===v}>${v}s</option>`)}</select></label>` : ""}
+                  ${cfg("entity_backlight") ? html`<label><ha-switch ?checked=${backlightOn} @change=${(e) => this._setLight(eid("entity_backlight"), e.target.checked)}></ha-switch> Backlight</label>` : ""}
+                  ${cfg("entity_display_interval") ? html`<label><ha-icon icon="mdi:timer-outline"></ha-icon> <select @change=${(e) => this._setNumber(eid("entity_display_interval"), +e.target.value)}>${[15,30,60,120,300,600].map((v) => html`<option value=${v} ?selected=${intervalVal===v}>${v}s</option>`)}</select></label>` : ""}
                 </div>
               `)
             : ""}
