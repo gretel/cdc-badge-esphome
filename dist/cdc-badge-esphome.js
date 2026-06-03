@@ -5,7 +5,7 @@
 // Shows battery, network, hardware, keypad, secure element,
 // and lets you push notifications to the e-paper display.
 
-import { LitElement, html, css, nothing } from "https://unpkg.com/lit@3.2.0/lit-core.js?module";
+import { LitElement, html, css, nothing } from "https://unpkg.com/lit@3.2.0/index.js?module";
 
 // ── Helpers ──────────────────────────────────────────────────
 
