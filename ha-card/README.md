@@ -8,7 +8,15 @@ Shows real-time badge telemetry — battery, power, network, keypad state, secur
 
 ## Install
 
-1. Copy `cdc-badge-card.js` to your HA `config/www/` directory.
+### Via HACS (recommended)
+
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=gretel&repository=cdc-badge-esphome&category=plugin)
+
+Or add manually: **HACS → Integrations → Custom repositories** → URL: `https://github.com/gretel/cdc-badge-esphome` → Category: `Lovelace`.
+
+### Manual
+
+1. Copy `cdc-badge-card.js` from the [repo root](https://github.com/gretel/cdc-badge-esphome/blob/main/cdc-badge-card.js) to your HA `config/www/` directory.
 
 2. Add a resource in your dashboard config:
 

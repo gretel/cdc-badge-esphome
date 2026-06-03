@@ -145,6 +145,18 @@ Auto-detects the badge and flashes.
 | ------ | -- | ----- | ------- |
 | Display Update Interval | `display_update_interval` | 5-3600s | 60s |
 
+## Home Assistant dashboard card
+
+A custom Lovelace card is available for the CDC Badge — battery gauge, live keypad, secure element status, and push-to-display notify, all in one card.
+
+Install via **HACS** ([add repository](https://my.home-assistant.io/redirect/hacs_repository/?owner=gretel&repository=cdc-badge-esphome&category=plugin)):
+
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=gretel&repository=cdc-badge-esphome&category=plugin)
+
+Or manually copy `cdc-badge-card.js` to `<config>/www/` and add a resource `/local/cdc-badge-card.js` (type: JavaScript Module).
+
+See [`ha-card/README.md`](ha-card/README.md) for full configuration reference.
+
 ## Reusable components
 
 This repo provides two reusable [external_components](https://esphome.io/components/external_components/):

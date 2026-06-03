@@ -1,0 +1,8 @@
+{
+  "name": "CDC Badge Card",
+  "filename": "cdc-badge-card.js",
+  "content_in_root": true,
+  "render_readme": true,
+  "homeassistant": "2024.1.0",
+  "country": "US"
+}
