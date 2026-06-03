@@ -7,7 +7,7 @@ set -euo pipefail
 
 DEVICE="${1:-}"
 YAML="cdc-badge.yaml"
-BUILD_DIR=".esphome/build/cdc-badge/.pioenvs/cdc-badge"
+BUILD_DIR=".esphome/build/cdc-badge/build"
 
 if [ -z "$DEVICE" ]; then
     # Auto-detect single serial device
@@ -26,13 +26,6 @@ esphome compile "$YAML"
 
 # Detect OTA (IP / hostname) vs serial (/dev/*)
 if [[ "$DEVICE" == /dev/* ]]; then
-    echo "=== Fixing binary name ==="
-    cd "$BUILD_DIR"
-    if [ -f firmware.bin ] && [ ! -f cdc-badge.bin ]; then
-        ln -s firmware.bin cdc-badge.bin
-    fi
-    cd -
-
     echo "=== Flashing via serial: $DEVICE ==="
     esptool --chip esp32s3 \
         --port "$DEVICE" \
@@ -42,10 +35,10 @@ if [[ "$DEVICE" == /dev/* ]]; then
         --flash-mode dio \
         --flash-freq 80m \
         --flash-size 16MB \
-        0x0 bootloader.bin \
-        0x8000 partitions.bin \
-        0x9000 ota_data_initial.bin \
-        0x10000 firmware.bin
+        0x0 "$BUILD_DIR/bootloader/bootloader.bin" \
+        0x8000 "$BUILD_DIR/partition_table/partition-table.bin" \
+        0x9000 "$BUILD_DIR/ota_data_initial.bin" \
+        0x10000 "$BUILD_DIR/cdc-badge.bin"
 else
     echo "=== Flashing via OTA: $DEVICE ==="
     esphome upload "$YAML" --device "$DEVICE"
