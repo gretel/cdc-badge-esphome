@@ -67,7 +67,7 @@ api:
               std::string value((const char *)id(tr01)->r_mem_buf(), read_len);
               id(se_r_mem_value).publish_state(value);
             } else {
-              id(se_r_mem_value).publish_state("(empty)");
+              id(se_r_mem_value).publish_state("");
             }
         # Return the value as JSON response (visible in Developer Tools)
         - api.respond:
