@@ -149,9 +149,9 @@ Auto-detects the badge and flashes.
 
 A custom Lovelace card is available for the CDC Badge — battery gauge, live keypad, secure element status, and push-to-display notify, all in one card.
 
-Install via **HACS** ([add repository](https://my.home-assistant.io/redirect/hacs_repository/?owner=gretel&repository=cdc-badge-esphome&category=plugin)):
+Install via **HACS** ([add repository](https://my.home-assistant.io/redirect/hacs_repository/?owner=gretel&repository=https%3A%2F%2Fgithub.com%2Fgretel%2Fcdc-badge-esphome&category=Dashboard)):
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=gretel&repository=cdc-badge-esphome&category=plugin)
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=gretel&repository=https%3A%2F%2Fgithub.com%2Fgretel%2Fcdc-badge-esphome&category=Dashboard)
 
 Or manually copy `cdc-badge-esphome.js` to `<config>/www/` and add a resource `/local/cdc-badge-esphome.js` (type: JavaScript Module).
 

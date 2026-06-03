@@ -10,7 +10,7 @@ Shows real-time badge telemetry — battery, power, network, keypad state, secur
 
 ### Via HACS (recommended)
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=gretel&repository=cdc-badge-esphome&category=plugin)
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=gretel&repository=https%3A%2F%2Fgithub.com%2Fgretel%2Fcdc-badge-esphome&category=Dashboard)
 
 Or add manually: **HACS → Integrations → Custom repositories** → URL: `https://github.com/gretel/cdc-badge-esphome` → Category: `Lovelace`.
 
