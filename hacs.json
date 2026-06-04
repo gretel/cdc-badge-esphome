@@ -1,7 +1,0 @@
-{
-  "name": "CDC Badge Card",
-  "filename": "cdc-badge-esphome.js",
-  "render_readme": true,
-  "homeassistant": "2024.1.0",
-  "country": "US"
-}

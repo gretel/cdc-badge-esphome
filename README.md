@@ -6,27 +6,7 @@ ESPHome firmware for the [CDC Badge](https://github.com/riatlabs/cdc-badge).
 
 ## Quickstart
 
-> **Quick flash** — grab the pre-built firmware from `dist/` and flash in
-> one command (no Python, no compile).
-> ```bash
-> git clone https://github.com/gretel/cdc-badge-esphome.git
-> cd cdc-badge-esphome
-> ./flash.sh --prebuilt /dev/cu.usbmodemXXXX
-> ```
-> Your badge shows up as a USB serial device — `/dev/cu.usbmodemXXXX` on macOS.
->
-> Or flash manually with `esptool`:
-> ```bash
-> esptool --chip esp32s3 --port /dev/cu.usbmodemXXXX --before default-reset --after hard-reset \
->     write-flash --flash-mode dio --flash-freq 80m --flash-size 16MB \
->     0x0 dist/bootloader.bin \
->     0x8000 dist/partitions.bin \
->     0x9000 dist/ota_data_initial.bin \
->     0x10000 dist/firmware.bin
-> ```
-> **Need `esptool`?** `pip install esptool` or `brew install esptool`.
-
-### Prerequisites (building from source)
+### Prerequisites
 
 - CDC Badge hardware
 - USB-C cable
@@ -65,10 +45,12 @@ Now edit `secrets.yaml` with your
 ### Build & flash
 
 ```bash
-./flash.sh
+esphome run cdc-badge.yaml --device /dev/cu.usbmodemXXXX
 ```
 
-Auto-detects the badge, compiles, and flashes.
+Your badge shows up as a USB serial device — `/dev/cu.usbmodemXXXX` on macOS.
+`esphome run` compiles then uploads via serial. Omit `--device` if you
+have only one USB serial device connected.
 
 ## Hardware
 
