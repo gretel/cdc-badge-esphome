@@ -9,7 +9,7 @@ ESPHome firmware for the [CDC Badge](https://github.com/riatlabs/cdc-badge).
 ### Prerequisites
 
 - CDC Badge hardware
-- USB-C cable
+- USB-C cable (first flash only)
 - Python 3.9+
 - [`uv`](https://docs.ashral.sh/uv/getting-started/installation/) or `pip`
 
@@ -45,12 +45,28 @@ Now edit `secrets.yaml` with your
 ### Build & flash
 
 ```bash
-esphome run cdc-badge.yaml --device /dev/cu.usbmodemXXXX
+esphome run cdc-badge.yaml
 ```
 
-Your badge shows up as a USB serial device — `/dev/cu.usbmodemXXXX` on macOS.
-`esphome run` compiles then uploads via serial. Omit `--device` if you
-have only one USB serial device connected.
+## Reusable components
+
+This repo provides two reusable [external_components](https://esphome.io/components/external_components/):
+
+| Component | Bus | Description |
+|-----------|-----|-------------|
+| `bq25895` | I²C | Battery charger driver (sensor, text_sensor, binary_sensor) |
+| `tropic01` | SPI | Secure element driver (R-Memory, tamper, FW version) |
+
+See [`components/README.md`](components/README.md) for config schemas, usage examples, and API docs.
+
+```yaml
+external_components:
+  - source:
+      type: git
+      url: https://github.com/gretel/cdc-badge-esphome
+      ref: main
+    components: [bq25895, tropic01]
+```
 
 ## Hardware
 
@@ -76,8 +92,6 @@ have only one USB serial device connected.
 | SAO IO1 / IO2 | GPIO15 / 16 |
 | Grove (GPIO2) / FLASH / WAKE | GPIO2 / 0 / 1 |
 
-> **Grove switch wiring:** GPIO2 is a bare GPIO — no external pull resistor. The firmware uses `INPUT` mode with debounce filters (`delayed_on: 5ms`, `delayed_off: 200ms`) to suppress noise on the floating pin. Connect switch between **Pin 2 (3.3V)** and **Pin 3 (GPIO2)** — not GND. Press = HIGH = Active.
-
 ### I2C bus
 
 | Address | Device |
@@ -85,8 +99,6 @@ have only one USB serial device connected.
 | 0x20 | TCA9535 keypad expander |
 | 0x50 | SAO EEPROM |
 | 0x6A | BQ25895 charger |
-
-
 
 ## API (Home Assistant)
 
@@ -146,35 +158,3 @@ have only one USB serial device connected.
 | Number | ID | Range | Default |
 | ------ | -- | ----- | ------- |
 | Display Update Interval | `display_update_interval` | 5-3600s | 60s |
-
-## Home Assistant dashboard card
-
-A custom Lovelace card is available for the CDC Badge — battery gauge, live keypad, secure element status, and push-to-display notify, all in one card.
-
-Install via **HACS** ([add repository](https://my.home-assistant.io/redirect/hacs_repository/?owner=gretel&repository=https%3A%2F%2Fgithub.com%2Fgretel%2Fcdc-badge-esphome&category=Dashboard)):
-
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=gretel&repository=https%3A%2F%2Fgithub.com%2Fgretel%2Fcdc-badge-esphome&category=Dashboard)
-
-Or manually copy `cdc-badge-esphome.js` to `<config>/www/` and add a resource `/local/cdc-badge-esphome.js` (type: JavaScript Module).
-
-See [`ha-card/README.md`](ha-card/README.md) for full configuration reference.
-
-## Reusable components
-
-This repo provides two reusable [external_components](https://esphome.io/components/external_components/):
-
-| Component | Bus | Description |
-|-----------|-----|-------------|
-| `bq25895` | I²C | Battery charger driver (sensor, text_sensor, binary_sensor) |
-| `tropic01` | SPI | Secure element driver (R-Memory, tamper, FW version) |
-
-See [`components/README.md`](components/README.md) for config schemas, usage examples, and API docs.
-
-```yaml
-external_components:
-  - source:
-      type: git
-      url: https://github.com/gretel/cdc-badge-esphome
-      ref: main
-    components: [bq25895, tropic01]
-```
