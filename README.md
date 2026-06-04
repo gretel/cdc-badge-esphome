@@ -6,14 +6,34 @@ ESPHome firmware for the [CDC Badge](https://github.com/riatlabs/cdc-badge).
 
 ## Quickstart
 
-### Prerequisites
+> **Quick flash** — grab the pre-built firmware from `dist/` and flash in
+> one command (no Python, no compile).
+> ```bash
+> git clone https://github.com/gretel/cdc-badge-esphome.git
+> cd cdc-badge-esphome
+> ./flash.sh --prebuilt /dev/cu.usbmodemXXXX
+> ```
+> Your badge shows up as a USB serial device — `/dev/cu.usbmodemXXXX` on macOS.
+>
+> Or flash manually with `esptool`:
+> ```bash
+> esptool --chip esp32s3 --port /dev/cu.usbmodemXXXX --before default-reset --after hard-reset \
+>     write-flash --flash-mode dio --flash-freq 80m --flash-size 16MB \
+>     0x0 dist/bootloader.bin \
+>     0x8000 dist/partitions.bin \
+>     0x9000 dist/ota_data_initial.bin \
+>     0x10000 dist/firmware.bin
+> ```
+> **Need `esptool`?** `pip install esptool` or `brew install esptool`.
+
+### Prerequisites (building from source)
 
 - CDC Badge hardware
 - USB-C cable
 - Python 3.9+
-- [`uv`](https://docs.astral.sh/uv/getting-started/installation/) or `pip`
+- [`uv`](https://docs.ashral.sh/uv/getting-started/installation/) or `pip`
 
-### Get the firmware
+### Get the source
 
 ```bash
 git clone https://github.com/gretel/cdc-badge-esphome.git
@@ -29,7 +49,7 @@ uv tool install esphome
 ### Generate API Key
  
 * The ESPHome documentation has a [key generator](https://esphome.io/components/api/#configuration-variables).
-* Advanced users may considers using [`esphome-keymaker`](https://github.com/rpezzotti/esphome-keymaker).
+* Advanced users may consider using [`esphome-keymaker`](https://github.com/rpezzotti/esphome-keymaker).
 
 ### Configure
 
@@ -42,13 +62,13 @@ Now edit `secrets.yaml` with your
 - Home Assistant API Key
 - OTA Key (random string or password)
 
-### Flash
+### Build & flash
 
 ```bash
 ./flash.sh
 ```
 
-Auto-detects the badge and flashes.
+Auto-detects the badge, compiles, and flashes.
 
 ## Hardware
 
