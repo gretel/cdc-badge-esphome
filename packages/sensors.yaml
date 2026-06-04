@@ -25,15 +25,9 @@ text_sensor:
     charge_status:
       id: charge_status
       name: "Charge Status"
-      on_value:
-        then:
-          - script.execute: refresh_display   # update screen when charge state changes
     bus_status:
       id: usb_bus_status
       name: "USB Bus Status"
-      on_value:
-        then:
-          - script.execute: refresh_display
 
   # TROPIC01 R-Memory read result (set by the se_read API service)
   - platform: template
@@ -63,9 +57,6 @@ sensor:
     charge_current:
       id: charge_current
       name: "Charge Current"
-      on_value:
-        then:
-          - script.execute: refresh_display   # refresh when current changes (plug/unplug)
 
   # ── Chip health ────────────────────────────────────────────
   - platform: internal_temperature
@@ -145,7 +136,6 @@ binary_sensor:
   # ── Keypad (12 keys via TCA9535 IO expander at I²C 0x20) ───
   # Each key maps to one GPIO on the xl9535.  Inputs are pulled HIGH internally
   # and driven LOW on press, so inverted=true makes pressed → true.
-  # On any state change the display refreshes to show the updated status.
   # Keys 0-7 → xl9535 pins 0-7, Keys 8-9 → pins 10-11, YES/NO → pins 12-13.
   - platform: gpio
     id: key_0
@@ -155,9 +145,6 @@ binary_sensor:
       number: 0
       mode: INPUT
       inverted: true
-    on_state:
-      then:
-        - script.execute: refresh_display
   # Keys 1–9 follow the same pattern: incrementing xl9535 pin number
   - platform: gpio
     id: key_1
@@ -167,9 +154,6 @@ binary_sensor:
       number: 1
       mode: INPUT
       inverted: true
-    on_state:
-      then:
-        - script.execute: refresh_display
   - platform: gpio
     id: key_2
     name: "Key 2"
@@ -178,9 +162,6 @@ binary_sensor:
       number: 2
       mode: INPUT
       inverted: true
-    on_state:
-      then:
-        - script.execute: refresh_display
   - platform: gpio
     id: key_3
     name: "Key 3"
@@ -189,9 +170,6 @@ binary_sensor:
       number: 3
       mode: INPUT
       inverted: true
-    on_state:
-      then:
-        - script.execute: refresh_display
   - platform: gpio
     id: key_4
     name: "Key 4"
@@ -200,9 +178,6 @@ binary_sensor:
       number: 4
       mode: INPUT
       inverted: true
-    on_state:
-      then:
-        - script.execute: refresh_display
   - platform: gpio
     id: key_5
     name: "Key 5"
@@ -211,9 +186,6 @@ binary_sensor:
       number: 5
       mode: INPUT
       inverted: true
-    on_state:
-      then:
-        - script.execute: refresh_display
   - platform: gpio
     id: key_6
     name: "Key 6"
@@ -222,9 +194,6 @@ binary_sensor:
       number: 6
       mode: INPUT
       inverted: true
-    on_state:
-      then:
-        - script.execute: refresh_display
   - platform: gpio
     id: key_7
     name: "Key 7"
@@ -233,9 +202,6 @@ binary_sensor:
       number: 7
       mode: INPUT
       inverted: true
-    on_state:
-      then:
-        - script.execute: refresh_display
   # Key 8-9: pin numbers skip to 10-11 (xl9535 has extra IO on upper pins)
   - platform: gpio
     id: key_8
@@ -245,9 +211,6 @@ binary_sensor:
       number: 10
       mode: INPUT
       inverted: true
-    on_state:
-      then:
-        - script.execute: refresh_display
   - platform: gpio
     id: key_9
     name: "Key 9"
@@ -256,9 +219,6 @@ binary_sensor:
       number: 11
       mode: INPUT
       inverted: true
-    on_state:
-      then:
-        - script.execute: refresh_display
   - platform: gpio
     id: key_yes
     name: "Key YES"
@@ -267,9 +227,6 @@ binary_sensor:
       number: 12
       mode: INPUT
       inverted: true
-    on_state:
-      then:
-        - script.execute: refresh_display
   - platform: gpio
     id: key_no
     name: "Key NO"
@@ -278,9 +235,6 @@ binary_sensor:
       number: 13
       mode: INPUT
       inverted: true
-    on_state:
-      then:
-        - script.execute: refresh_display
 
   # ── Grove motion sensor (GPIO2, PIR) ────────────────────────
   # GPIO2 is a bare input with no external pull.  Debounce filters suppress
@@ -295,9 +249,6 @@ binary_sensor:
     filters:
       - delayed_on: 20ms     # signal must be stable HIGH for 20ms before triggering
       - delayed_off: 20ms    # same for falling edge
-    on_state:
-      then:
-        - script.execute: refresh_display
 
   # ── Flash / BOOT button (GPIO0) ────────────────────────────
   # Also acts as ESP32 strapping pin (pulled LOW at boot enters download mode).
