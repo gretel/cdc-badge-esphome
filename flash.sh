@@ -1,8 +1,8 @@
 #!/bin/bash
 # Flash CDC Badge
-#   serial: ./flash.sh               # auto-detect single USB device
-#   serial: ./flash.sh /dev/cu.usbmodemXXXX
-#   OTA:    ./flash.sh 10.0.23.118
+#   automatic:  ./flash.sh
+#   serial:     ./flash.sh /dev/cu.usbmodemXXXX
+#   OTA:        ./flash.sh 10.0.23.118
 set -euo pipefail
 
 DEVICE="${1:-}"

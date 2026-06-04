@@ -31,11 +31,11 @@ time:
   - platform: homeassistant
     id: homeassistant_time   # used by the display lambda to show HH:MM in header
 
-# ── BLE radio (required by Improv) ───────────────────────────
-esp32_ble:
-  use_psram: true
+# # ── BLE radio (required by Improv) ───────────────────────────
+# esp32_ble:
+#   use_psram: true
 
-# ── ESPHome Improv (Wi‑Fi provisioning over BLE) ─────────────
-# Press the flash button to authorise a new device to send Wi‑Fi credentials.
-esp32_improv:
-  authorizer: flash_button
+# # ── ESPHome Improv (Wi‑Fi provisioning over BLE) ─────────────
+# # Press the flash button to authorise a new device to send Wi‑Fi credentials.
+# esp32_improv:
+#   authorizer: flash_button

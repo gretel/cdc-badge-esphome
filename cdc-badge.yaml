@@ -73,7 +73,6 @@ esp32:
   board: esp32-s3-devkitc1-n16r8
   variant: ESP32S3
   flash_size: 16MB
-  toolchain: esp-idf
   framework:
     type: esp-idf
     # ESP-IDF advanced tuning — these reduce binary size and free IRAM
