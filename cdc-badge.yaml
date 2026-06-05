@@ -55,13 +55,11 @@ esphome:
     version: ${project_version}
   min_version: 2026.5.0
   area: ${device_area}
-  # Boot sequence: wait for e-paper init → start periodic refresh loop →
-  # flash backlight briefly so user knows the badge is alive
+  # Boot sequence: wait for peripherals to settle → backlight blink
+  # LVGL auto-initializes and renders the first frame during the delay.
   on_boot:
     then:
       - delay: 3s             # let SPI/I²C peripherals settle after power-on
-      - script.execute: display_loop   # start the periodic display refresh loop
-      - delay: 2s             # wait for first frame to render
       - light.turn_on:        # backlight ON for 1s to signal successful boot
           id: epd_backlight
           brightness: 1
@@ -113,6 +111,7 @@ packages:
   - !include packages/network.yaml
   - !include packages/api.yaml
   - !include packages/display.yaml
+  - !include packages/lvgl-ui.yaml
   - !include packages/controls.yaml
   - !include packages/sensors.yaml
   - !include packages/tropic01.yaml

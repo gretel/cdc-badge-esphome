@@ -42,9 +42,8 @@ spi:
     miso_pin: GPIO11
 
 # ── E-paper display: GDEY029T94 (SSD1680, 296×128, portrait) ─
-# This lambda runs every time the display needs to redraw.
-# `it` is the display object — use it.print / it.line / it.fill to draw pixels.
-# y tracks the current vertical cursor position as we build the screen top→bottom.
+# LVGL owns the framebuffer — no lambda, no manual drawing.
+# Rotation is handled by LVGL config (rotation: 90).
 display:
   - platform: epaper_spi
     id: badge_display
@@ -56,221 +55,26 @@ display:
     dc_pin: GPIO45
     reset_pin: GPIO46
     busy_pin: GPIO42
-    full_update_every: 10       # every 10th refresh is a full flash (clears ghosting)
-    rotation: 90                # rotate 90° so 128-wide screen becomes 296-wide
-    init_sequence:              # chip-specific registers (from datasheet)
-      - [0x01, 0x27, 0x01, 0x00]   # soft-reset + gate setting
-      - [0x18, 0x80]               # temperature sensor selection
-      - [0x11, 0x03]               # data entry mode
-    lambda: |-
-      // ===== SLEEP SCREEN =====
-      // When sleep_mode is true we draw a minimal low-power screen.
-      // Pressing any key wakes the badge (EXP_IRQ → GPIO1 → wake from deep sleep).
-      if (id(sleep_mode)) {
-        it.fill(COLOR_ON);                                   // white background
-        it.print(5, 1, id(font_m), COLOR_OFF, "CDC Badge");
-        it.line(5, 17, 290, 17, COLOR_OFF);                  // horizontal rule
-        if (id(sleep_since) > 0) {
-          // Convert the stored Unix timestamp to "Sleeping since HH:MM"
-          time_t ts = id(sleep_since);
-          struct tm *st = localtime(&ts);
-          char buf[32];
-          std::strftime(buf, sizeof(buf), "Sleeping since %H:%M", st);
-          it.print(5, 40, id(font_s), COLOR_OFF, buf);
-        } else {
-          it.print(5, 40, id(font_s), COLOR_OFF, "Sleeping...");
-        }
-        it.print(5, 65, id(font_s), COLOR_OFF, "Any key to wake");
-        return;   // ← exit early, don't render the normal screen below
-      }
+    full_update_every: 10
+    auto_clear_enabled: false
+    update_interval: never
+    init_sequence:
+      - [0x01, 0x27, 0x01, 0x00]
+      - [0x18, 0x80]
+      - [0x11, 0x03]
 
-
-      // ===== NORMAL SCREEN (waking / not sleeping) =====
-      // 296 × 128 logical pixels after the 90° rotation.
-      // Most calls use `id(font_s)` (12px) for info rows, `id(font_m)` (14px) for headers.
-      it.fill(COLOR_ON);          // start with a clean white canvas
-      char buf[96];
-      int y = 1;                  // current vertical line (pixel position)
-
-      // ── Header row: "CDC Badge" + time + uptime ──────────────
-      // std::snprintf writes into buf and returns the number of chars written.
-      // We chain calls: first write "CDC Badge", then append " HH:MM", then " Up:1h23m".
-      {
-        int n = std::snprintf(buf, sizeof(buf), "CDC Badge");
-        if (id(homeassistant_time).now().is_valid()) {
-          char t[6];
-          id(homeassistant_time).now().strftime(t, sizeof(t), "%H:%M");
-          n += std::snprintf(buf + n, sizeof(buf) - n, " %s", t);
-        }
-        if (id(badge_uptime).has_state()) {
-          int secs = (int)id(badge_uptime).state;
-          n += std::snprintf(buf + n, sizeof(buf) - n, " Up:%dh%dm",
-                             secs / 3600, (secs % 3600) / 60);
-        }
-        it.print(5, y, id(font_m), COLOR_OFF, buf);   // render at x=5 with header font
-        y += 16;
-      }
-
-      it.line(5, y, 290, y, COLOR_OFF);                 // separator line
-      y += 4;
-
-      // ── Line 2: firmware version + manual refresh count ─────
-      // "R:N" increments each time someone manually triggers refresh.
-      if (id(badge_version).has_state())
-        it.printf(5, y, id(font_s), COLOR_OFF, "Ver:%s R:%d",
-                  id(badge_version).state.c_str(), id(refresh_count));
-      else
-        it.printf(5, y, id(font_s), COLOR_OFF, "Ver:-- R:%d", id(refresh_count));
-      y += 13;
-
-      // ── Line 3: USB port status + charge status + current + voltage ─
-      // The BQ25895 returns verbose strings like "USB-Host" or "Charging Done";
-      // we abbreviate them to fit the 296-pixel line.
-      {
-        const char *usb_raw = id(usb_bus_status).has_state()
-          ? id(usb_bus_status).state.c_str() : "--";
-        const char *usb = (strncmp(usb_raw, "USB-", 4) == 0)
-          ? usb_raw + 4 : usb_raw;            // strip "USB-" prefix
-        if (strcmp(usb, "None") == 0) usb = "-";
-
-        const char *chg = id(charge_status).has_state()
-          ? id(charge_status).state.c_str() : "--";
-        const char *chs = chg;
-        // Shorten status strings to fit screen width
-        if (strcmp(chg, "Charging Done") == 0) chs = "Done";
-        else if (strcmp(chg, "Not Charging") == 0) chs = "NoPwr";
-        else if (strcmp(chg, "Pre-charging") == 0) chs = "PreChg";
-        else if (strcmp(chg, "Discharging") == 0) chs = "Dischg";
-        else if (strcmp(chg, "Charging") == 0) chs = "Chrg";
-
-        int n = std::snprintf(buf, sizeof(buf), "USB:%s | CHG:%s | ", usb, chs);
-        if (id(charge_current).has_state())
-          n += std::snprintf(buf + n, sizeof(buf) - n,
-                             "Cur:%.0f | ", id(charge_current).state);
-        else
-          n += std::snprintf(buf + n, sizeof(buf) - n, "Cur:-- | ");
-        if (id(batt_voltage).has_state())
-          n += std::snprintf(buf + n, sizeof(buf) - n,
-                             "B:%.2fV", id(batt_voltage).state);
-        else
-          n += std::snprintf(buf + n, sizeof(buf) - n, "B:--");
-        it.print(5, y, id(font_s), COLOR_OFF, buf);
-      }
-      y += 13;
-
-      // ── Line 4: secure element alarm + CPU temp + WiFi RSSI + SSID ─
-      {
-        int n = std::snprintf(buf, sizeof(buf), "SE:%s | ",
-                              id(tr01_alarm).state ? "ALARM" : "OK");
-        if (id(core_temp).has_state())
-          n += std::snprintf(buf + n, sizeof(buf) - n,
-                             "T:%.1fC | ", id(core_temp).state);
-        else
-          n += std::snprintf(buf + n, sizeof(buf) - n, "T:-- | ");
-        if (id(wifi_sig).has_state()) {
-          // Convert RSSI dBm (−100 .. 0) to a 0–100% "strength" for readability
-          float sig = id(wifi_sig).state;
-          int pct = (sig + 100.0f) * 2.0f;
-          if (pct < 0) pct = 0;
-          if (pct > 100) pct = 100;
-          n += std::snprintf(buf + n, sizeof(buf) - n,
-                             "W:%.0fdBm %d%%", sig, pct);
-        } else {
-          n += std::snprintf(buf + n, sizeof(buf) - n, "W:--");
-        }
-        if (id(wifi_ssid).has_state()) {
-          const char *sid = id(wifi_ssid).state.c_str();
-          n += std::snprintf(buf + n, sizeof(buf) - n, " %.10s", sid);   // max 10 chars
-        }
-        it.print(5, y, id(font_s), COLOR_OFF, buf);
-      }
-      y += 13;
-
-      // ── Line 5: IP address ──────────────────────────────────
-      if (id(ip_addr).has_state())
-        std::snprintf(buf, sizeof(buf), "IP:%s", id(ip_addr).state.c_str());
-      else
-        std::snprintf(buf, sizeof(buf), "IP:--");
-      it.print(5, y, id(font_s), COLOR_OFF, buf);
-      y += 13;
-
-      // ── Line 6: Grove motion sensor + SAO expansion GPIOs ──
-      std::snprintf(buf, sizeof(buf), "Grove:%s | IO1:%s | IO2:%s",
-                    id(pir_motion).state ? "Active" : "Idle",
-                    id(sao_gpio1).state ? "ON" : "OFF",
-                    id(sao_gpio2).state ? "ON" : "OFF");
-      it.print(5, y, id(font_s), COLOR_OFF, buf);
-      y += 13;
-
-      // ── Notification bar (bottom, larger font) ──────────────
-      // The notif_msg text_sensor is set by the Home Assistant "notify" service.
-      // If empty we just draw the separator line.
-      it.line(5, y, 290, y, COLOR_OFF);
-      y += 4;
-      if (strlen(id(notif_msg).state.c_str()) > 0)
-        it.print(5, y, id(font_m), COLOR_OFF,
-                 id(notif_msg).state.c_str());
-
-
-# ── Fonts (Google Inter, embedded via gfonts://) ─────────────
+# ── Fonts (Google Montserrat, embedded via gfonts://) ─────────
+# These are used by LVGL widgets via text_font references.
+# font_s (14px) — small data labels (wifi signal, percentage)
+# font_m (18px) — medium labels (IP, SSID, notification)
+# font_l (20px) — large notification text
 font:
-  - file: "gfonts://Inter"
-    id: font_m               # medium (14px) — used for header + notification
-    size: ${font_large}
-  - file: "gfonts://Inter"
-    id: font_s               # small (12px) — used for all data rows
-    size: ${font_small}
-
-# ── Display update interval (configurable from HA) ───────────
-number:
-  - platform: template
-    id: display_update_interval
-    name: "Display Update Interval"
-    unit_of_measurement: "s"
-    min_value: 5
-    max_value: 3600
-    step: 5
-    initial_value: ${display_update_default}
-    restore_value: true      # survives reboots
-    entity_category: "config"
-    optimistic: true         # report instantly, don't wait for confirmation
-
-# ── Display-level globals ────────────────────────────────────
-globals:
-  - id: refresh_count         # how many times refresh_display script has run
-    type: int
-    initial_value: "0"
-    restore_value: no
-  - id: last_refresh           # millis() timestamp of last manual refresh
-    type: int
-    initial_value: "0"
-    restore_value: no
-
-# ── Display update scripts ───────────────────────────────────
-script:
-  # Single‑use refresh — increments counter, redraws, then waits for e-paper
-  - id: refresh_display
-    # if called again while running, queue one more run
-    mode: single
-    then:
-      # bump the R:N counter shown in the display header
-      - lambda: |-
-          id(refresh_count) = id(refresh_count) + 1;
-          id(last_refresh) = millis();
-      # trigger e-paper redraw, then wait for the slow panel
-      - lambda: "id(badge_display)->update();"
-      - delay: 2500ms
-
-  # Periodic loop — redraws on a configurable timer
-  - id: display_loop
-    # cancels any previous instance of the same loop
-    mode: restart
-    then:
-      - lambda: "id(badge_display)->update();"
-      # read user interval (seconds), convert to ms, minimum 5 s
-      - delay: !lambda |-
-          float interval = id(display_update_interval).state;
-          if (interval < 5) interval = 60;
-          return (int)(interval * 1000);
-      # re-schedule → infinite loop
-      - script.execute: display_loop
+  - file: "gfonts://Montserrat"
+    id: font_s
+    size: 14
+  - file: "gfonts://Montserrat"
+    id: font_m
+    size: 18
+  - file: "gfonts://Montserrat"
+    id: font_l
+    size: 20

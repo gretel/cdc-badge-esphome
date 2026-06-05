@@ -11,12 +11,10 @@ api:
       variables:
         message: string
       then:
-        # Step 1: write the message string into the notif_msg text_sensor
-        # Step 2: force e-paper to redraw (display lambda reads notif_msg)
+        # Write message to text_sensor → on_value triggers LVGL widget refresh
         - lambda: |-
-            std::string msg(message.c_str());           // copy HA string
-            id(notif_msg).publish_state(msg);            // publish to sensor
-            id(badge_display)->update();                 // force e‑paper refresh
+            std::string msg(message.c_str());
+            id(notif_msg).publish_state(msg);            // publish → triggers lvgl widget refresh
         - light.turn_on: epd_backlight
         - delay: 5s
         - light.turn_off: epd_backlight

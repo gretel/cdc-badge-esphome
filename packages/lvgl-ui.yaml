@@ -1,0 +1,330 @@
+# ── LVGL Tabview UI for CDC Badge ──────────────────────────────
+# Replaces the old lambda-driven display with LVGL.
+# Layout: 5-tab tabview (top 103px) + status bar row (bottom 25px)
+# Display buffer: 296×128 (after lvgl rotation:90 from display's 128×296)
+# Navigation: Keys 0-4 on keypad select tabs directly.
+
+# ── MDI icons (Material Design Icons embedded at compile time) ─
+image:
+  - file: "mdi:wifi"
+    id: img_wifi
+    type: BINARY
+    resize: 16x16
+  - file: "mdi:bluetooth"
+    id: img_bluetooth
+    type: BINARY
+    resize: 16x16
+  - file: "mdi:usb"
+    id: img_usb
+    type: BINARY
+    resize: 16x16
+  - file: "mdi:alert"
+    id: img_warning
+    type: BINARY
+    resize: 40x40
+  - file: "mdi:sleep"
+    id: img_sleep
+    type: BINARY
+    resize: 40x40
+  - file: "mdi:battery-charging"
+    id: img_bolt
+    type: BINARY
+    resize: 14x14
+  - file: "mdi:battery"
+    id: img_battery
+    type: BINARY
+    resize: 16x16
+  - file: "mdi:lan"
+    id: img_ip
+    type: BINARY
+    resize: 16x16
+  - file: "mdi:access-point"
+    id: img_ssid
+    type: BINARY
+    resize: 16x16
+
+# ── LVGL Controller ────────────────────────────────────────────
+# Full-refresh e-paper mode.  LVGL owns the display framebuffer.
+lvgl:
+  id: lvgl_main
+  displays: badge_display
+  rotation: 90
+  full_refresh: true
+  update_when_display_idle: true
+  color_depth: 16
+  buffer_size: 100%
+  pages:
+    - id: main_page
+      bg_color: 0x000000
+      pad_all: 0
+      widgets:
+        # ── Tabview: 5 tabs across top 103px ───────────────────
+        # Tab bar ~28px, content ~75px, pad 4px → ~67px per tab
+        - tabview:
+            id: tabs
+            x: 0
+            y: 0
+            width: 296
+            height: 103
+            bg_color: 0x000000
+            border_color: 0x000000
+            tab_style:
+              bg_color: 0x000000
+              text_color: 0xFFFFFF
+              items:
+                checked:
+                  bg_color: 0x000000
+                  text_color: 0xFFFFFF
+                  border_color: 0x000000
+                pressed:
+                  bg_color: 0xFFFFFF
+                  text_color: 0x000000
+            tabs:
+              # ── CDC tab: notification message scroll ────────
+              - name: CDC
+                pad_top: 4
+                pad_right: 4
+                pad_bottom: 4
+                pad_left: 4
+                widgets:
+                  - label:
+                      id: notification
+                      width: 100%
+                      height: 100%
+                      text: !lambda |-
+                        auto &msg = id(notif_msg).state;
+                        return msg.empty() ? std::string("Ready") : msg;
+                      text_color: 0x000000
+                      bg_color: 0xFFFFFF
+                      bg_opa: COVER
+                      text_align: LEFT
+                      text_font: font_l
+                      long_mode: SCROLL
+                      radius: 5
+
+              # ── NET tab: IP, SSID, signal strength ─────────
+              - name: NET
+                pad_top: 4
+                pad_right: 4
+                pad_bottom: 4
+                pad_left: 4
+                widgets:
+                  - image:
+                      src: img_ip
+                      x: 0
+                      y: 1
+                      recolor: 0xFFFFFF
+                      recolor_opa: COVER
+                  - label:
+                      id: ipaddress
+                      x: 22
+                      y: 0
+                      width: 258
+                      height: 18
+                      text: !lambda |-
+                        return id(ip_addr).has_state()
+                          ? id(ip_addr).state : std::string("--.--.--.--");
+                      text_color: 0x000000
+                      bg_color: 0xFFFFFF
+                      bg_opa: COVER
+                      text_align: CENTER
+                      text_font: font_m
+                      radius: 8
+                  - image:
+                      src: img_ssid
+                      x: 0
+                      y: 23
+                      recolor: 0xFFFFFF
+                      recolor_opa: COVER
+                  - label:
+                      id: ssid
+                      x: 22
+                      y: 22
+                      width: 258
+                      height: 18
+                      text: !lambda |-
+                        return id(wifi_ssid).has_state()
+                          ? id(wifi_ssid).state : std::string("--");
+                      text_color: 0x000000
+                      bg_color: 0xFFFFFF
+                      bg_opa: COVER
+                      text_align: CENTER
+                      text_font: font_m
+                      radius: 8
+                  - image:
+                      src: img_wifi
+                      x: 0
+                      y: 45
+                      recolor: 0xFFFFFF
+                      recolor_opa: COVER
+                  - label:
+                      id: wifi_signal_label
+                      x: 22
+                      y: 44
+                      width: 120
+                      height: 18
+                      text: !lambda |-
+                        return id(wifi_sig).has_state()
+                          ? std::to_string((int)id(wifi_sig).state) + " dBm"
+                          : std::string("-- dBm");
+                      text_color: 0x000000
+                      bg_color: 0xFFFFFF
+                      bg_opa: COVER
+                      text_align: CENTER
+                      text_font: font_s
+                      radius: 8
+                  - label:
+                      id: wifi_strength_label
+                      x: 150
+                      y: 44
+                      width: 132
+                      height: 18
+                      text: !lambda |-
+                        return id(wifi_strength).has_state()
+                          ? std::to_string((int)id(wifi_strength).state) + "%"
+                          : std::string("--");
+                      text_color: 0x000000
+                      bg_color: 0xFFFFFF
+                      bg_opa: COVER
+                      text_align: CENTER
+                      text_font: font_s
+                      radius: 8
+
+              # ── PWR tab: sleep icon + placeholder ──────────
+              - name: PWR
+                pad_top: 4
+                pad_right: 4
+                pad_bottom: 4
+                pad_left: 4
+                widgets:
+                  - image:
+                      src: img_sleep
+                      x: 68
+                      y: 12
+                      recolor: 0xFFFFFF
+                      recolor_opa: COVER
+                  - image:
+                      src: img_warning
+                      x: 168
+                      y: 12
+                      recolor: 0xFFFFFF
+                      recolor_opa: COVER
+
+              # ── TRPC tab: placeholder ──────────────────────
+              - name: TRPC
+                pad_top: 4
+                pad_right: 4
+                pad_bottom: 4
+                pad_left: 4
+                widgets:
+                  - image:
+                      src: img_warning
+                      x: 120
+                      y: 12
+                      recolor: 0xFFFFFF
+                      recolor_opa: COVER
+
+              # ── HACK tab: placeholder ──────────────────────
+              - name: HACK
+                pad_top: 4
+                pad_right: 4
+                pad_bottom: 4
+                pad_left: 4
+                widgets:
+                  - image:
+                      src: img_warning
+                      x: 120
+                      y: 12
+                      recolor: 0xFFFFFF
+                      recolor_opa: COVER
+
+        # ── Status bar: connectivity icons ──────────────────
+        # Positioned below the tabview, above bottom edge.
+        - image:
+            id: wifi_status_icon
+            src: img_wifi
+            x: 10
+            y: 106
+            recolor: 0xFFFFFF
+            recolor_opa: COVER
+            hidden: !lambda return id(wifi_ssid).state.empty();
+
+        - image:
+            id: usb_status_icon
+            src: img_usb
+            x: 70
+            y: 106
+            recolor: 0xFFFFFF
+            recolor_opa: COVER
+            hidden: !lambda return !id(charger_vbus).state;
+
+        - image:
+            id: bt_status_icon
+            src: img_bluetooth
+            x: 40
+            y: 106
+            recolor: 0xFFFFFF
+            recolor_opa: COVER
+            hidden: true
+
+        # ── Status bar: power info (battery bar, icons) ────
+        - container:
+            id: power_object
+            x: 148
+            y: 105
+            width: 138
+            height: 23
+            bg_color: 0x000000
+            border_width: 1
+            border_color: 0x4B5563
+            radius: 6
+            pad_all: 0
+            widgets:
+              - image:
+                  src: img_battery
+                  x: 28
+                  y: 4
+                  recolor: 0xFFFFFF
+                  recolor_opa: COVER
+              - bar:
+                  id: battery_percentage
+                  x: 51
+                  y: 4
+                  width: 80
+                  height: 14
+                  value: 0
+                  min_value: 0
+                  max_value: 100
+                  indicator:
+                    bg_color: 0xFFFFFF
+                  bg_color: 0x1F2937
+                  border_width: 2
+                  border_color: 0xFFFFFF
+                  radius: 14
+
+# ── Tab tracking for keypad navigation ──────────────────────
+globals:
+  - id: active_tab_idx
+    type: int
+    initial_value: "0"
+
+
+# ── Periodic label refresh ────────────────────────────────────
+# LVGL labels with text: !lambda don't auto-refresh.
+# This interval re-evaluates all dynamic labels every 30s.
+# Individual sensor on_value triggers provide immediate refresh.
+interval:
+  - interval: 30s
+    then:
+      - lvgl.widget.refresh: notification
+      - lvgl.widget.refresh: ipaddress
+      - lvgl.widget.refresh: ssid
+      - lvgl.widget.refresh: wifi_signal_label
+      - lvgl.widget.refresh: wifi_strength_label
+      - lvgl.widget.refresh: wifi_status_icon
+      - lvgl.widget.refresh: usb_status_icon
+      - lvgl.bar.update:
+          id: battery_percentage
+          value: !lambda |-
+            return id(battery_pct).has_state()
+              ? (int)id(battery_pct).state : 0;

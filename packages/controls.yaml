@@ -8,10 +8,10 @@ switch:
     restore_mode: RESTORE_DEFAULT_ON
     on_turn_on:
       then:
-        - script.execute: refresh_display    # update screen to show new state
+        - lambda: "id(active_tab_idx);"  # placeholder — no-op
     on_turn_off:
       then:
-        - script.execute: refresh_display
+        - lambda: "id(active_tab_idx);"  # placeholder — no-op
   - platform: gpio
     id: sao_gpio2
     name: "SAO IO2"
@@ -19,10 +19,10 @@ switch:
     restore_mode: RESTORE_DEFAULT_ON
     on_turn_on:
       then:
-        - script.execute: refresh_display
+        - lambda: "id(active_tab_idx);"  # placeholder — no-op
     on_turn_off:
       then:
-        - script.execute: refresh_display
+        - lambda: "id(active_tab_idx);"  # placeholder — no-op
 
 # ── Action buttons ────────────────────────────────────────────
 button:
@@ -39,7 +39,7 @@ button:
     name: "Safe Mode Boot"
     entity_category: "config"
 
-  # Enter deep sleep: show sleep screen → cut power → wake on any key press
+  # Enter deep sleep: show PWR tab (sleep icon) → cut power → wake on any key press
   - platform: template
     id: sleep_btn
     name: "Deep Sleep"
@@ -47,28 +47,24 @@ button:
     entity_category: "config"
     on_press:
       then:
-        # 1. Mark badge as sleeping + record wall-clock time (for the sleep screen)
-        - lambda: |-
-            id(sleep_mode) = true;
-            id(sleep_since) = id(homeassistant_time).now().timestamp;
-        # 2. Stop the periodic display loop so it doesn't fight the sleep screen
-        - script.stop: display_loop
-        # 3. Force a final redraw → e-paper shows "Sleeping…" message
-        - lambda: "id(badge_display)->update();"
-        # 4. Wait for the slow e-paper to finish its refresh cycle
-        - delay: 2s
-        # 5. Kill the backlight so it's not lit during sleep
+        # 1. Switch to PWR tab — shows the sleep icon on e-paper
+        - lambda: "id(active_tab_idx) = 2;"
+        - lvgl.tabview.select:
+            id: tabs
+            index: 2
+        # 2. Wait for the slow e-paper to finish its refresh cycle
+        - delay: 3s
+        # 3. Kill the backlight
         - light.turn_off: epd_backlight
         - delay: 200ms
-        # 6. Clear any pending interrupt on the TCA9535 IO expander,
-        #    otherwise the first key press after wake only clears the latch
-        #    and doesn't actually wake the chip.
+        # 4. Clear any pending interrupt on the TCA9535 IO expander,
+        #    otherwise the first key press after wake only clears the latch.
         - lambda: |-
             { uint8_t v; id(keypad_expander)->read_byte(0x00, &v); id(keypad_expander)->read_byte(0x01, &v); }
-        # 7. Enter deep sleep — GPIO1 (EXP_IRQ) is configured as wake pin
+        # 5. Enter deep sleep — GPIO1 (EXP_IRQ) is configured as wake pin
         - deep_sleep.enter
 
-  # Force a display refresh (increments R:N counter on screen)
+  # Force a full e-paper refresh (clears ghosting)
   - platform: template
     id: refresh_btn
     name: "Refresh Display"
@@ -76,4 +72,4 @@ button:
     entity_category: "config"
     on_press:
       then:
-        - script.execute: refresh_display
+        - lambda: "id(badge_display)->update();"
