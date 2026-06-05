@@ -5,6 +5,7 @@ from esphome.const import (
     CONF_ID,
 )
 from pathlib import Path
+from esphome.core import CORE
 
 # SPI not declared as formal dependency — this component manages SPI via
 # ESP-IDF directly (shared bus with display, manual CS).
@@ -83,24 +84,17 @@ async def to_code(config):
         sens = await binary_sensor.new_binary_sensor(alarm_config)
         cg.add(var.set_alarm_sensor(sens))
 
-    # libtropic include paths (relative to this __init__.py)
-    component_dir = Path(__file__).parent
+    # libtropic include paths, resolved from the ESPHome config directory
+    component_dir = (Path(CORE.config_path).parent / "components" / "tropic01").resolve()
+
     # src/ for ESP-IDF SPI port (libtropic_port_esp32.cpp, included via unity build)
-    cg.add_build_flag(
-        f"-I{component_dir / 'src'}"
-    )
+    cg.add_build_flag(f"-I{(component_dir / 'src').as_posix()}")
     # libtropic public headers
-    cg.add_build_flag(
-        f"-I{component_dir / 'src' / 'libtropic' / 'include'}"
-    )
+    cg.add_build_flag(f"-I{(component_dir / 'src' / 'libtropic' / 'include').as_posix()}")
     # libtropic internal headers (needed by .c sources during unity build)
-    cg.add_build_flag(
-        f"-I{component_dir / 'src' / 'libtropic' / 'src'}"
-    )
+    cg.add_build_flag(f"-I{(component_dir / 'src' / 'libtropic' / 'src').as_posix()}")
     # mbedTLS v4 CAL headers
-    cg.add_build_flag(
-        f"-I{component_dir / 'src' / 'libtropic' / 'cal' / 'mbedtls_v4'}"
-    )
+    cg.add_build_flag(f"-I{(component_dir / 'src' / 'libtropic' / 'cal' / 'mbedtls_v4').as_posix()}")
 
     # libtropic configuration (use build flags, not add_define, so C files see them)
     cg.add_build_flag("-DACAB")
