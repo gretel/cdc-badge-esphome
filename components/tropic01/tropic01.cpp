@@ -2,6 +2,7 @@
 #include "libtropic.h"
 #include "libtropic_common.h"
 #include "libtropic_mbedtls_v4.h"
+#include "libtropic_port.h"
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wredundant-decls"
 #include "psa/crypto.h"
@@ -13,13 +14,22 @@
 #include <cstdio>
 #include <cstring>
 
-// SPI port device context — used by lt_port_* functions below.
-struct lt_dev_esp32_t {
-    spi_device_handle_t spi;
-    gpio_num_t cs_pin;
-};
-
 namespace esphome::tropic01 {
+
+// Global pointer for SPI port workaround — libtropic v3 may null l2.device.
+// Set in setup(), used by lt_port_spi_* functions before setup() completes
+// the component may not exist yet, but we only need the workaround after
+// a secure session has been established (which is after setup()).
+Tropic01Component *g_tr01_component = nullptr;
+
+Tropic01Component::~Tropic01Component() {
+  if (g_tr01_component == this) {
+    g_tr01_component = nullptr;
+  }
+  delete handle_;
+  delete crypto_ctx_;
+  // dev_ destroyed automatically by unique_ptr
+}
 
 static const char *const TAG = "tropic01";
 
@@ -54,27 +64,25 @@ bool Tropic01Component::init_tropic() {
     return true;
 
   // Allocate device context for the SPI port layer
-  auto *dev = new lt_dev_esp32_t{};
-  dev->cs_pin = cs_pin_;
-  dev->spi = nullptr;
+  dev_ = std::make_unique<lt_dev_esp32_t>();
+  dev_->cs_pin = cs_pin_;
+  dev_->spi = nullptr;
 
-  // Allocate libtropic handle
+  // Allocate crypto context (mbedTLS v4 CAL)
+  crypto_ctx_ = new lt_ctx_mbedtls_v4_t{};
+  std::memset(crypto_ctx_, 0, sizeof(lt_ctx_mbedtls_v4_t));
+
+  // Allocate libtropic handle and wire up dependencies
   handle_ = new lt_handle_t{};
   std::memset(handle_, 0, sizeof(lt_handle_t));
-  handle_->l2.device = dev;
-
-  // Allocate crypto context (mbedTLS v4 CAL) — lt_init needs this
-  handle_->l3.crypto_ctx = new lt_ctx_mbedtls_v4_t{};
-  std::memset(handle_->l3.crypto_ctx, 0, sizeof(lt_ctx_mbedtls_v4_t));
+  handle_->l2.device = dev_.get();
+  handle_->l3.crypto_ctx = crypto_ctx_;
 
   // Initialise mbedTLS PSA Crypto API — required before any hash/AES operations
   psa_status_t psa_ret = psa_crypto_init();
   if (psa_ret != PSA_SUCCESS) {
     ESP_LOGE(TAG, "psa_crypto_init failed: %d", (int)psa_ret);
-    delete static_cast<lt_ctx_mbedtls_v4_t *>(handle_->l3.crypto_ctx);
-    delete dev;
-    delete handle_;
-    handle_ = nullptr;
+    // unique_ptrs auto-clean on scope exit
     return false;
   }
 
@@ -82,10 +90,7 @@ bool Tropic01Component::init_tropic() {
   if (ret != LT_OK) {
     ESP_LOGE(TAG, "lt_init failed: 0x%X (%s)", (unsigned)ret,
              lt_ret_verbose(ret));
-    delete static_cast<lt_ctx_mbedtls_v4_t *>(handle_->l3.crypto_ctx);
-    delete dev;
-    delete handle_;
-    handle_ = nullptr;
+    // unique_ptrs auto-clean on scope exit
     return false;
   }
 
@@ -95,6 +100,9 @@ bool Tropic01Component::init_tropic() {
 }
 
 void Tropic01Component::setup() {
+  // Register this instance for SPI port workaround
+  g_tr01_component = this;
+
   ESP_LOGCONFIG(TAG, "Setting up TROPIC01...");
   if (!init_tropic()) {
     ESP_LOGE(TAG, "TROPIC01 init failed, will retry in update loop");
@@ -113,22 +121,19 @@ void Tropic01Component::update() {
 }
 
 void Tropic01Component::update_sensors() {
+  Tropic01Data data{};
+
+  // Populate all fields
   ChipMode mode = read_chip_mode();
+  std::strncpy(data.chip_mode, mode_to_str(mode), sizeof(data.chip_mode) - 1);
+  data.alarm = (mode == ChipMode::ALARM);
 
-  if (chip_mode_sensor_) {
-    chip_mode_sensor_->publish_state(mode_to_str(mode));
-  }
+  read_fw_versions(data);
+  read_chip_id(data);
 
-  if (alarm_sensor_) {
-    alarm_sensor_->publish_state(mode == ChipMode::ALARM);
-  }
-
-  if (fw_riscv_sensor_ || fw_spect_sensor_) {
-    read_fw_versions();
-  }
-
-  if (chip_serial_sensor_) {
-    read_chip_id();
+  // Notify all registered sub-platform sensors
+  for (auto *listener : listeners_) {
+    listener->on_data(data);
   }
 
   if (mode == ChipMode::ALARM) {
@@ -141,6 +146,7 @@ void Tropic01Component::update_sensors() {
 
 ChipMode Tropic01Component::read_chip_mode() {
   lt_tr01_mode_t mode;
+  ESP_LOGI(TAG, "read_chip_mode h=%p mode=%p", (void*)handle_, (void*)&mode);
   lt_ret_t ret = lt_get_tr01_mode(handle_, &mode);
   if (ret != LT_OK) {
     ESP_LOGW(TAG, "lt_get_tr01_mode failed: 0x%X", (unsigned)ret);
@@ -152,29 +158,25 @@ ChipMode Tropic01Component::read_chip_mode() {
   return tr01_mode_to_chip(mode);
 }
 
-bool Tropic01Component::read_fw_versions() {
+bool Tropic01Component::read_fw_versions(Tropic01Data &data) {
   uint8_t ver_riscv[4] = {};
   lt_ret_t ret = lt_get_info_riscv_fw_ver(handle_, ver_riscv);
-  if (ret == LT_OK && fw_riscv_sensor_) {
-    char buf[32];
-    std::snprintf(buf, sizeof(buf), "%u.%u.%u", ver_riscv[3], ver_riscv[2],
-                  ver_riscv[1]);
-    fw_riscv_sensor_->publish_state(buf);
+  if (ret == LT_OK) {
+    std::snprintf(data.fw_riscv, sizeof(data.fw_riscv), "%u.%u.%u",
+                  ver_riscv[3], ver_riscv[2], ver_riscv[1]);
   }
 
   uint8_t ver_spect[4] = {};
   ret = lt_get_info_spect_fw_ver(handle_, ver_spect);
-  if (ret == LT_OK && fw_spect_sensor_) {
-    char buf[32];
-    std::snprintf(buf, sizeof(buf), "%u.%u.%u", ver_spect[3], ver_spect[2],
-                  ver_spect[1]);
-    fw_spect_sensor_->publish_state(buf);
+  if (ret == LT_OK) {
+    std::snprintf(data.fw_spect, sizeof(data.fw_spect), "%u.%u.%u",
+                  ver_spect[3], ver_spect[2], ver_spect[1]);
   }
 
   return true;
 }
 
-bool Tropic01Component::read_chip_id() {
+bool Tropic01Component::read_chip_id(Tropic01Data &data) {
   struct lt_chip_id_t chip_id;
   lt_ret_t ret = lt_get_info_chip_id(handle_, &chip_id);
   if (ret != LT_OK) {
@@ -182,9 +184,7 @@ bool Tropic01Component::read_chip_id() {
     return false;
   }
 
-  // Format serial number fields
-  char buf[128];
-  std::snprintf(buf, sizeof(buf),
+  std::snprintf(data.chip_serial, sizeof(data.chip_serial),
                 "SN:%u LOT:%02X%02X%02X%02X%02X W:%u XY:%u,%u",
                 chip_id.ser_num.sn,
                 chip_id.ser_num.lot_id[0], chip_id.ser_num.lot_id[1],
@@ -192,10 +192,7 @@ bool Tropic01Component::read_chip_id() {
                 chip_id.ser_num.lot_id[4],
                 chip_id.ser_num.wafer_id,
                 chip_id.ser_num.x_coord, chip_id.ser_num.y_coord);
-  if (chip_serial_sensor_) {
-    chip_serial_sensor_->publish_state(buf);
-  }
-  ESP_LOGI(TAG, "Chip ID: %s", buf);
+  ESP_LOGI(TAG, "Chip ID: %s", data.chip_serial);
   return true;
 }
 
@@ -205,6 +202,33 @@ void Tropic01Component::dump_config() {
   ESP_LOGCONFIG(TAG, "  SPI Data Rate: %u Hz", spi_data_rate_);
   ESP_LOGCONFIG(TAG, "  Initialized: %s", YESNO(initialized_));
   ESP_LOGCONFIG(TAG, "  Secure Session: %s", YESNO(session_established_));
+}
+
+void Tropic01Component::on_safe_shutdown() {
+  // No critical pre-shutdown work needed for this component
+}
+
+void Tropic01Component::on_shutdown() {
+  // Mark session as closed — any in-flight R-Memory op will fail fast
+  session_established_ = false;
+}
+
+bool Tropic01Component::teardown() {
+  // Remove SPI device from shared bus (leaves bus init to ESPHome SPI component)
+  if (handle_ && handle_->l2.device) {
+    lt_port_deinit(&handle_->l2);
+  }
+  return true;
+}
+
+void Tropic01Component::on_powerdown() {
+  // Release libtropic resources
+  delete handle_;
+  handle_ = nullptr;
+  delete crypto_ctx_;
+  crypto_ctx_ = nullptr;
+  dev_.reset();
+  initialized_ = false;
 }
 
 // =========================================================================
@@ -219,13 +243,22 @@ bool Tropic01Component::ensure_secure_session() {
   if (session_established_)
     return true;
 
-  ESP_LOGI(TAG, "Establishing L3 secure session (SH0)...");
+  // WORKAROUND: libtropic v3.3.0 may corrupt `l2.device` during secure session
+  // establishment (missing RSP_LEN check in lt_l2_frame_check → buffer overflow).
+  // Save the device pointer before the call and restore it after.
+  // Fixed in libtropic v4.0.0.
+  void *const saved_device = handle_ ? handle_->l2.device : nullptr;
   lt_ret_t ret = lt_verify_chip_and_start_secure_session(
       handle_, sh0priv_prod0, sh0pub_prod0, TR01_PAIRING_KEY_SLOT_INDEX_0);
+  if (handle_ && saved_device) {
+    handle_->l2.device = saved_device;
+  }
 
   if (ret != LT_OK) {
     ESP_LOGE(TAG, "Secure session failed: 0x%X (%s)",
              (unsigned)ret, lt_ret_verbose(ret));
+    ESP_LOGE(TAG, "  initialized=%d session_established=%d",
+             initialized_, session_established_);
     return false;
   }
 
@@ -241,13 +274,15 @@ void Tropic01Component::r_mem_write(uint16_t slot, const uint8_t *data,
     return;
   }
 
+  ESP_LOGI(TAG, "r_mem_write slot=%u size=%u h=%p data=%p",
+           slot, data_size, (void*)handle_, (void*)data);
   lt_ret_t ret = lt_r_mem_data_write(handle_, slot, data, data_size);
   if (ret != LT_OK) {
     ESP_LOGE(TAG, "R-Memory write slot %u (%u bytes) failed: 0x%X (%s)",
              slot, data_size, (unsigned)ret, lt_ret_verbose(ret));
     this->status_set_warning();
   } else {
-    ESP_LOGI(TAG, "R-Memory write slot %u: %u bytes", slot, data_size);
+    ESP_LOGI(TAG, "R-Memory write slot %u: %u bytes OK", slot, data_size);
     this->status_clear_warning();
   }
 }
@@ -260,6 +295,9 @@ void Tropic01Component::r_mem_read(uint16_t slot, uint16_t &read_len) {
   }
 
   uint16_t actual = 0;
+  ESP_LOGI(TAG, "r_mem_read slot=%u start h=%p data=%p dsz=%u act=%p",
+           slot, (void*)handle_, (void*)r_mem_read_buf_,
+           (unsigned)sizeof(r_mem_read_buf_), (void*)&actual);
   lt_ret_t ret = lt_r_mem_data_read(handle_, slot, r_mem_read_buf_,
                                      sizeof(r_mem_read_buf_), &actual);
   if (ret != LT_OK) {
@@ -268,7 +306,8 @@ void Tropic01Component::r_mem_read(uint16_t slot, uint16_t &read_len) {
     this->status_set_warning();
   } else {
     read_len = actual;
-    ESP_LOGI(TAG, "R-Memory read slot %u: %u bytes", slot, actual);
+    ESP_LOGI(TAG, "R-Memory read slot %u: %u bytes data=[%.*s]",
+             slot, actual, actual, r_mem_read_buf_);
     this->status_clear_warning();
   }
 }
@@ -279,6 +318,8 @@ void Tropic01Component::r_mem_erase(uint16_t slot) {
     return;
   }
 
+  ESP_LOGI(TAG, "r_mem_erase slot=%u start h=%p",
+           slot, (void*)handle_);
   lt_ret_t ret = lt_r_mem_data_erase(handle_, slot);
   if (ret != LT_OK) {
     ESP_LOGE(TAG, "R-Memory erase slot %u failed: 0x%X (%s)",
@@ -298,18 +339,16 @@ void Tropic01Component::r_mem_erase(uint16_t slot) {
 // These must be extern "C" with C linkage because libtropic expects them.
 // =========================================================================
 
-#include "libtropic_port.h"
-#include "driver/spi_master.h"
 #include "esp_random.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
 // SPI bus: shared with display (SPI2_HOST), manual CS, 10 MHz
+// We init the bus ourselves (handles ESP_ERR_INVALID_STATE if ESPHome's
+// spi component already initialized SPI2_HOST).  DEPENDENCIES = ["spi"]
+// ensures the SPI framework is loaded before our setup().
 #define SPI_BUS_HOST  SPI2_HOST
 #define SPI_DMA_CHAN  SPI_DMA_CH_AUTO
-
-// Track bus init so second call is a no-op
-static bool s_spi_initialized = false;
 
 extern "C" lt_ret_t lt_port_init(lt_l2_state_t *s2) {
     if (!s2 || !s2->device) return LT_PARAM_ERR;
@@ -324,21 +363,18 @@ extern "C" lt_ret_t lt_port_init(lt_l2_state_t *s2) {
     gpio_config(&io_conf);
     gpio_set_level(dev->cs_pin, 1);
 
-    if (!s_spi_initialized) {
-        spi_bus_config_t buscfg = {};
-        buscfg.mosi_io_num = GPIO_NUM_13;
-        buscfg.miso_io_num = GPIO_NUM_11;
-        buscfg.sclk_io_num = GPIO_NUM_12;
-        buscfg.quadwp_io_num = -1;
-        buscfg.quadhd_io_num = -1;
-        buscfg.max_transfer_sz = 4096;
-        buscfg.flags = SPICOMMON_BUSFLAG_MASTER;
-        esp_err_t err = spi_bus_initialize(SPI_BUS_HOST, &buscfg, SPI_DMA_CHAN);
-        if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
-            ESP_LOGE("TR01-SPI", "SPI bus init failed: %d", err);
-            return LT_L1_SPI_ERROR;
-        }
-        s_spi_initialized = true;
+    spi_bus_config_t buscfg = {};
+    buscfg.mosi_io_num = GPIO_NUM_13;
+    buscfg.miso_io_num = GPIO_NUM_11;
+    buscfg.sclk_io_num = GPIO_NUM_12;
+    buscfg.quadwp_io_num = -1;
+    buscfg.quadhd_io_num = -1;
+    buscfg.max_transfer_sz = 4096;
+    buscfg.flags = SPICOMMON_BUSFLAG_MASTER;
+    esp_err_t err = spi_bus_initialize(SPI_BUS_HOST, &buscfg, SPI_DMA_CHAN);
+    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+        ESP_LOGE("TR01-SPI", "SPI bus init failed: %d", err);
+        return LT_L1_SPI_ERROR;
     }
 
     spi_device_interface_config_t devcfg = {};
@@ -358,13 +394,33 @@ extern "C" lt_ret_t lt_port_init(lt_l2_state_t *s2) {
 extern "C" lt_ret_t lt_port_deinit(lt_l2_state_t *s2) {
     if (!s2 || !s2->device) return LT_PARAM_ERR;
     auto *dev = static_cast<lt_dev_esp32_t *>(s2->device);
+    ESP_LOGI("TR01-DEINIT", "lt_port_deinit called, spi=%p", (void*)dev->spi);
     if (dev->spi) { spi_bus_remove_device(dev->spi); dev->spi = nullptr; }
     gpio_set_level(dev->cs_pin, 1);
     return LT_OK;
 }
 
+// Forward declaration for workaround — declared at namespace scope above.
+// Workaround: libtropic v3.3.0 may null `l2.device` via buffer overflow during
+// secure session (missing RSP_LEN check). We re-wrap from global dev_ as fallback.
+// Fixed in libtropic v4.0.0.
+namespace esphome::tropic01 {
+extern Tropic01Component *g_tr01_component;
+}
+
 extern "C" lt_ret_t lt_port_spi_csn_low(lt_l2_state_t *s2) {
-    if (!s2 || !s2->device) return LT_PARAM_ERR;
+    if (!s2) { ESP_LOGW("TR01-CSN", "csn_low: s2 null"); return LT_PARAM_ERR; }
+    // Workaround: restore device pointer if libtropic corrupted it
+    if (!s2->device) {
+        s2->device = esphome::tropic01::g_tr01_component
+                         ? esphome::tropic01::g_tr01_component->get_dev()
+                         : nullptr;
+        if (!s2->device) {
+            ESP_LOGW("TR01-CSN", "csn_low: device still null after workaround");
+            return LT_PARAM_ERR;
+        }
+        ESP_LOGI("TR01-CSN", "csn_low: restored device=%p", s2->device);
+    }
     auto *dev = static_cast<lt_dev_esp32_t *>(s2->device);
     gpio_set_level(dev->cs_pin, 0);
     return LT_OK;
@@ -380,9 +436,20 @@ extern "C" lt_ret_t lt_port_spi_csn_high(lt_l2_state_t *s2) {
 extern "C" lt_ret_t lt_port_spi_transfer(lt_l2_state_t *s2, uint8_t offset,
                                           uint16_t tx_len, uint32_t timeout_ms) {
     (void)timeout_ms;
-    if (!s2 || !s2->device) return LT_PARAM_ERR;
+    if (!s2) { ESP_LOGW("TR01-SPI", "xfer: s2 null"); return LT_PARAM_ERR; }
+    // Workaround: restore device pointer if libtropic corrupted it
+    if (!s2->device) {
+        s2->device = esphome::tropic01::g_tr01_component
+                         ? esphome::tropic01::g_tr01_component->get_dev()
+                         : nullptr;
+        if (!s2->device) {
+            ESP_LOGW("TR01-SPI", "xfer: device still null after workaround");
+            return LT_PARAM_ERR;
+        }
+        ESP_LOGI("TR01-SPI", "xfer: restored device=%p", s2->device);
+    }
     auto *dev = static_cast<lt_dev_esp32_t *>(s2->device);
-    if (!dev->spi) return LT_L1_SPI_ERROR;
+    if (!dev->spi) { ESP_LOGW("TR01-SPI", "xfer: dev->spi null"); return LT_L1_SPI_ERROR; }
 
     spi_transaction_t t = {};
     t.length = tx_len * 8;

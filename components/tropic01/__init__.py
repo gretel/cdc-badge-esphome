@@ -1,15 +1,11 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import text_sensor, binary_sensor
-from esphome.const import (
-    CONF_ID,
-)
+from esphome.const import CONF_ID
 from pathlib import Path
 
-# SPI not declared as formal dependency — this component manages SPI via
-# ESP-IDF directly (shared bus with display, manual CS).
-DEPENDENCIES = []
-AUTO_LOAD = ["text_sensor", "binary_sensor"]
+# This component manages SPI directly (shared bus with e-paper display).
+# Formal SPI dependency declared so ESPHome validates the bus is configured.
+DEPENDENCIES = ["spi"]
 CODEOWNERS = ["@riotindustries"]
 
 tropic01_ns = cg.esphome_ns.namespace("tropic01")
@@ -17,13 +13,10 @@ Tropic01Component = tropic01_ns.class_(
     "Tropic01Component", cg.PollingComponent
 )
 
+# Reference key for sub-platforms (text_sensor, binary_sensor)
+CONF_TROPIC01_ID = "tropic01_id"
 CONF_CS_PIN = "cs_pin"
 CONF_DATA_RATE = "data_rate"
-CONF_CHIP_MODE = "chip_mode"
-CONF_FW_RISCV = "fw_version_riscv"
-CONF_FW_SPECT = "fw_version_spect"
-CONF_CHIP_SERIAL = "chip_serial"
-CONF_ALARM = "alarm"
 
 CONFIG_SCHEMA = (
     cv.Schema(
@@ -32,22 +25,6 @@ CONFIG_SCHEMA = (
             cv.Required(CONF_CS_PIN): cv.int_range(min=0, max=48),
             cv.Optional(CONF_DATA_RATE, default=10000000): cv.int_range(
                 min=1000000, max=40000000
-            ),
-            cv.Optional(CONF_CHIP_MODE): text_sensor.text_sensor_schema(
-                icon="mdi:chip"
-            ),
-            cv.Optional(CONF_FW_RISCV): text_sensor.text_sensor_schema(
-                icon="mdi:counter"
-            ),
-            cv.Optional(CONF_FW_SPECT): text_sensor.text_sensor_schema(
-                icon="mdi:counter"
-            ),
-            cv.Optional(CONF_CHIP_SERIAL): text_sensor.text_sensor_schema(
-                icon="mdi:serial-port"
-            ),
-            cv.Optional(CONF_ALARM): binary_sensor.binary_sensor_schema(
-                icon="mdi:alert",
-                device_class="tamper",
             ),
         }
     )
@@ -61,27 +38,6 @@ async def to_code(config):
 
     cg.add(var.set_cs_pin(config[CONF_CS_PIN]))
     cg.add(var.set_spi_data_rate(config[CONF_DATA_RATE]))
-
-    # Register sensors
-    if chip_mode_config := config.get(CONF_CHIP_MODE):
-        sens = await text_sensor.new_text_sensor(chip_mode_config)
-        cg.add(var.set_chip_mode_sensor(sens))
-
-    if fw_riscv_config := config.get(CONF_FW_RISCV):
-        sens = await text_sensor.new_text_sensor(fw_riscv_config)
-        cg.add(var.set_fw_riscv_sensor(sens))
-
-    if fw_spect_config := config.get(CONF_FW_SPECT):
-        sens = await text_sensor.new_text_sensor(fw_spect_config)
-        cg.add(var.set_fw_spect_sensor(sens))
-
-    if chip_serial_config := config.get(CONF_CHIP_SERIAL):
-        sens = await text_sensor.new_text_sensor(chip_serial_config)
-        cg.add(var.set_chip_serial_sensor(sens))
-
-    if alarm_config := config.get(CONF_ALARM):
-        sens = await binary_sensor.new_binary_sensor(alarm_config)
-        cg.add(var.set_alarm_sensor(sens))
 
     # libtropic include paths (relative to this __init__.py)
     component_dir = Path(__file__).parent
