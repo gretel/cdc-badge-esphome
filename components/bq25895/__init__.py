@@ -49,15 +49,14 @@ CONFIG_SCHEMA = (
 
 
 async def to_code(config):
-    var = cg.new_Pvariable(
-        config[CONF_ID],
-        config[CONF_ENABLE_STATUS_LED],
-        config[CONF_INPUT_CURRENT_LIMIT],
-        config[CONF_CHARGE_VOLTAGE],
-        config[CONF_CHARGE_CURRENT],
-        config[CONF_PRECHARGE_CURRENT],
-        config[CONF_CHARGE_ENABLED],
-        config[CONF_ENABLE_ADC],
-    )
+    var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
     await i2c.register_i2c_device(var, config)
+
+    cg.add(var.set_led_enabled(config[CONF_ENABLE_STATUS_LED]))
+    cg.add(var.set_input_current_limit(config[CONF_INPUT_CURRENT_LIMIT]))
+    cg.add(var.set_charge_target_voltage(config[CONF_CHARGE_VOLTAGE]))
+    cg.add(var.set_charge_current(config[CONF_CHARGE_CURRENT]))
+    cg.add(var.set_precharge_current(config[CONF_PRECHARGE_CURRENT]))
+    cg.add(var.set_charge_enabled(config[CONF_CHARGE_ENABLED]))
+    cg.add(var.set_enable_adc_measure(config[CONF_ENABLE_ADC]))
