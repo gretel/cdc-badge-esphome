@@ -1,5 +1,4 @@
 #include "bq25895.h"
-#include "esphome/core/hal.h"
 #include "esphome/core/log.h"
 
 namespace esphome::bq25895 {
@@ -125,11 +124,9 @@ void BQ25895Component::update() {
     this->trigger_adc_();
   }
 
-  // Small delay to allow ADC to settle before reading
-  // The BQ25895 ADC typically completes in ~1ms, so 5ms is safe
-  delay(5);
-
   // Read all registers in one transaction
+  // ADC is in continuous mode — conversion runs independently;
+  // no settle delay needed.
   if (!this->read_all_registers_()) {
     ESP_LOGW(TAG, "Failed to read registers during update");
     this->status_set_warning();
