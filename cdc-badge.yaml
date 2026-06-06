@@ -6,7 +6,7 @@ substitutions:
   device_name: cdc-badge
   friendly_name: CDC Badge
   project_name: "riat.at"
-  project_version: "0.1.2"
+  project_version: "0.2.0"
   device_area: "Bootcamp"
 
   # Pin substitutions — change once if reusing this firmware on a different board

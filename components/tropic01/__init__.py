@@ -39,27 +39,15 @@ async def to_code(config):
     cg.add(var.set_cs_pin(config[CONF_CS_PIN]))
     cg.add(var.set_spi_data_rate(config[CONF_DATA_RATE]))
 
-    # libtropic include paths (relative to this __init__.py)
-    component_dir = Path(__file__).parent
-    # src/ for ESP-IDF SPI port (libtropic_port_esp32.cpp, included via unity build)
-    cg.add_build_flag(
-        f"-I{component_dir / 'src'}"
-    )
-    # libtropic public headers
-    cg.add_build_flag(
-        f"-I{component_dir / 'src' / 'libtropic' / 'include'}"
-    )
-    # libtropic internal headers (needed by .c sources during unity build)
-    cg.add_build_flag(
-        f"-I{component_dir / 'src' / 'libtropic' / 'src'}"
-    )
-    # mbedTLS v4 CAL headers
-    cg.add_build_flag(
-        f"-I{component_dir / 'src' / 'libtropic' / 'cal' / 'mbedtls_v4'}"
-    )
+    # libtropic include paths — vendored C library has headers split across
+    # public (include/), internal (src/), and CAL (cal/mbedtls_v4/) dirs.
+    # .as_posix() avoids Windows backslash issues in GCC -I flags.
+    base = Path(__file__).parent
+    for sub in ("src", "src/libtropic/include", "src/libtropic/src", "src/libtropic/cal/mbedtls_v4"):
+        cg.add_build_flag(f"-I{(base / sub).as_posix()}")
 
     # libtropic configuration (use build flags, not add_define, so C files see them)
-    cg.add_build_flag("-DACAB")
+    cg.add_build_flag("-DLT_SILICON_REV_ACAB")
     cg.add_build_flag("-DLT_HELPERS")
     cg.add_build_flag("-DLT_LOG_ENABLE_ERROR=1")
     cg.add_build_flag("-DLT_LOG_ENABLE_WARN=0")

@@ -1,0 +1,1 @@
+HomeAssistantAPI @ git+https://github.com/HomeAssistant-API/HomeAssistantAPI.git

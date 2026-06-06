@@ -1,5 +1,12 @@
 # ── Home Assistant API ─────────────────────────────────────────
 # Encrypted, persistent connection.  Services are callable from HA automations.
+
+# Internal scratch buffer — not exposed to HA, used by se_read service
+globals:
+  - id: se_read_buf
+    type: std::string
+    restore_value: no
+
 api:
   reboot_timeout: 0s          # never reboot just because HA went away
   encryption:
@@ -51,26 +58,32 @@ api:
                 (const uint8_t *)d.data(), d.size());
             }
 
-    # Read a slot → returns content as response + publishes to se_r_mem_value
+    # Read a slot → responds with value on success, error on empty/erased slot.
     - service: se_read
       supports_response: optional
       variables:
         slot: int
       then:
-        # Read from secure element into its internal buffer, publish to text_sensor
         - lambda: |-
             uint16_t read_len = 0;
-            id(tr01)->r_mem_read((uint16_t)slot, read_len);
-            if (read_len > 0) {
-              std::string value((const char *)id(tr01)->r_mem_buf(), read_len);
-              id(se_r_mem_value).publish_state(value);
+            int ret = id(tr01)->r_mem_read((uint16_t)slot, read_len);
+            if (ret == 0 && read_len > 0) {
+              id(se_read_buf) = std::string((const char *)id(tr01)->r_mem_buf(), read_len);
             } else {
-              id(se_r_mem_value).publish_state("");
+              id(se_read_buf).clear();
             }
-        # Return the value as JSON response (visible in Developer Tools)
-        - api.respond:
-            data: !lambda |-
-              root["value"] = id(se_r_mem_value).state;
+        - if:
+            condition:
+              lambda: "return !id(se_read_buf).empty();"
+            then:
+              - api.respond:
+                  data: !lambda |-
+                    root["value"] = id(se_read_buf);
+              - lambda: "{ auto &b = id(se_read_buf); std::fill(b.begin(), b.end(), '\\0'); b.clear(); }"
+            else:
+              - api.respond:
+                  success: false
+                  error_message: "Slot has no data"
 
     # Zero out a slot
     - service: se_erase

@@ -4,9 +4,9 @@
 /**
  * @file lt_x25519.h
  * @brief X25519 function declarations
- * @copyright Copyright (c) 2020-2025 Tropic Square s.r.o.
+ * @copyright Copyright (c) 2020-2026 Tropic Square s.r.o.
  *
- * @license For the license see file LICENSE.txt file in the root directory of this source tree.
+ * @license For the license see LICENSE.md in the root directory of this source tree.
  */
 
 #include "stdint.h"
@@ -23,7 +23,8 @@ extern "C" {
  * @param  secret    Shared secret (32B)
  * @return LT_OK if success, otherwise returns other error code.
  */
-lt_ret_t lt_X25519(const uint8_t *privkey, const uint8_t *pubkey, uint8_t *secret) __attribute__((warn_unused_result));
+lt_ret_t lt_X25519(const uint8_t *privkey, const uint8_t *pubkey, uint8_t *secret)
+    __attribute__((warn_unused_result));
 
 /**
  * @brief Performs X25519 scalar multiplication with a base point.

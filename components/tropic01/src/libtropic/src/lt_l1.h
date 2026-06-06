@@ -11,9 +11,9 @@
 /**
  * @file lt_l1.h
  * @brief Layer 1 functions declarations
- * @copyright Copyright (c) 2020-2025 Tropic Square s.r.o.
+ * @copyright Copyright (c) 2020-2026 Tropic Square s.r.o.
  *
- * @license For the license see file LICENSE.txt file in the root directory of this source tree.
+ * @license For the license see LICENSE.md in the root directory of this source tree.
  */
 
 #include "libtropic_common.h"
@@ -29,17 +29,41 @@ extern "C" {
 /** This bit in CHIP_STATUS byte signalizes that chip is in STARTUP mode */
 #define TR01_L1_CHIP_MODE_STARTUP_bit 0x04
 
-/** Max number of GET_INFO requests when chip is not answering */
+#ifndef LT_L1_READ_MAX_TRIES
+/** @brief Max number of Get_Response requests when chip is not answering.
+ *
+ * @note In CMake-based builds it is set in CMakeLists.txt and can be configured using CMake
+ * parameters.
+ */
 #define LT_L1_READ_MAX_TRIES 50
-/** Number of ms to wait between each GET_INFO request */
-#define LT_L1_READ_RETRY_DELAY 25
+#endif
 
-/** Minimal timeout when waiting for activity on SPI bus */
-#define LT_L1_TIMEOUT_MS_MIN 5
-/** Default timeout when waiting for activity on SPI bus */
-#define LT_L1_TIMEOUT_MS_DEFAULT 70
-/** Maximal timeout when waiting for activity on SPI bus */
-#define LT_L1_TIMEOUT_MS_MAX 150
+#ifndef LT_L1_READ_RETRY_DELAY_MS
+/** @brief Time to wait in ms between each Get_Response request.
+ *
+ * @note In CMake-based builds it is set in CMakeLists.txt and can be configured using CMake
+ * parameters.
+ */
+#define LT_L1_READ_RETRY_DELAY_MS 25
+#endif
+
+#ifndef LT_L1_SPI_TIMEOUT_MS
+/** @brief Timeout when waiting for activity on SPI bus.
+ *
+ * @note In CMake-based builds it is set in CMakeLists.txt and can be configured using CMake
+ * parameters.
+ */
+#define LT_L1_SPI_TIMEOUT_MS 70
+#endif
+
+#ifndef LT_L1_INT_TIMEOUT_MS
+/** @brief Timeout when waiting for interrupt from TROPIC01's GPO pin.
+ *
+ * @note In CMake-based builds it is set in CMakeLists.txt and can be configured using CMake
+ * parameters.
+ */
+#define LT_L1_INT_TIMEOUT_MS 200
+#endif
 
 /** Get response request's ID */
 #define TR01_L1_GET_RESPONSE_REQ_ID 0xAA
@@ -64,6 +88,21 @@ lt_ret_t lt_l1_read(lt_l2_state_t *s2, const uint32_t max_len, const uint32_t ti
  * @return            LT_OK if success, otherwise returns other error code.
  */
 lt_ret_t lt_l1_write(lt_l2_state_t *s2, const uint16_t len, const uint32_t timeout_ms)
+    __attribute__((warn_unused_result));
+
+/**
+ * @brief Retrieves alarm log from TROPIC01.
+ *
+ * @warning This function is for internal use only and it is not compatible
+ * with production TROPIC01 chips.
+ * @note This is called automatically only if LT_RETRIEVE_ALARM_LOG is defined.
+ *
+ * @param s2          Structure holding l2 state
+ * @param timeout_ms  Timeout
+ *
+ * @return LT_OK if success, otherwise returns other error code.
+ */
+lt_ret_t lt_l1_retrieve_alarm_log(lt_l2_state_t *s2, const uint32_t timeout_ms)
     __attribute__((warn_unused_result));
 
 /** @} */  // end of group_l1_functions

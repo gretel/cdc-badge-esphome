@@ -4,3 +4,7 @@ secrets.yaml
 __pycache__/
 .DS_Store
 .pi-lens/
+.handoffs/
+test/.venv/
+test/.env
+test/.env.example

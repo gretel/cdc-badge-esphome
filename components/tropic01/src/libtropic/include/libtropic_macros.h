@@ -4,7 +4,7 @@
 /**
  * @file libtropic_macros.h
  * @brief Various helper macros.
- * @copyright Copyright (c) 2020-2025 Tropic Square s.r.o.
+ * @copyright Copyright (c) 2020-2026 Tropic Square s.r.o.
  *
  * @license For the license see file LICENSE.md file in the root directory of this source tree.
  */
@@ -12,10 +12,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/** @brief Wrapper for static assertion. */
-// #define LT_STATIC_ASSERT(x) _Static_assert((x), "Static assertion failed");
-#define LT_STATIC_ASSERT(x)
 
 /** @brief Get struct member size at compile-time. */
 #define LT_MEMBER_SIZE(type, member) (sizeof(((type *)0)->member))
@@ -47,12 +43,19 @@ extern "C" {
         ___a < ___b ? ___a : ___b; \
     })
 
+#ifndef __cplusplus
+
 /**
  * @brief Get max value from compile-time constants at compile-time.
  * @note C-only version.
  */
-#ifndef __cplusplus
 #define LT_COMPTIME_MAX(a, b) __builtin_choose_expr((a) > (b), a, b)
+
+/** @brief Wrapper for static assertion.
+ *  @note C-only version.
+ */
+#define LT_STATIC_ASSERT(x) _Static_assert((x), "Static assertion failed");
+
 #endif
 
 #ifdef __cplusplus
@@ -69,6 +72,12 @@ constexpr T LT_COMPTIME_MAX(T a, T b)
 {
     return (a > b) ? a : b;
 }
+
+/** @brief Wrapper for static assertion.
+ *  @note C++-only version.
+ */
+#define LT_STATIC_ASSERT(x) static_assert((x), "Static assertion failed");
+
 #endif
 
 #endif  // LT_LIBTROPIC_MACROS

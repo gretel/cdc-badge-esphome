@@ -1,9 +1,9 @@
 /**
  * @file lt_crc16.c
  * @brief CRC16 functions definitions
- * @copyright Copyright (c) 2020-2025 Tropic Square s.r.o.
+ * @copyright Copyright (c) 2020-2026 Tropic Square s.r.o.
  *
- * @license For the license see file LICENSE.txt file in the root directory of this source tree.
+ * @license For the license see LICENSE.md in the root directory of this source tree.
  */
 
 #include "lt_crc16.h"
@@ -29,8 +29,8 @@ static uint16_t crc16_byte(uint8_t data, uint16_t crc)
     crc ^= current_byte << 8;
     i = 8;  // Iterate over every bit in a byte.
     do {
-        if (crc
-            & 0x8000) {  // Highest bit set -> carry -> add generator polynomial of finite field used in CRC calulation.
+        if (crc & 0x8000) {  // Highest bit set -> carry -> add generator polynomial of finite field
+                             // used in CRC calulation.
             crc <<= 1;
             crc ^= LT_CRC16_POLYNOMIAL;
         }

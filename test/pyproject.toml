@@ -1,0 +1,7 @@
+[project]
+name = "cdc-badge-test"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "HomeAssistant-API @ git+https://github.com/HomeAssistant-API/HomeAssistantAPI.git",
+]

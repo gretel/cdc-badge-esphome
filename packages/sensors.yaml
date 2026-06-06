@@ -35,11 +35,6 @@ text_sensor:
       id: usb_bus_status
       name: "USB Bus Status"
 
-  # TROPIC01 R-Memory read result (set by the se_read API service)
-  - platform: template
-    id: se_r_mem_value
-    name: "SE R-Memory Value"
-
   # Notification message — set from HA via the "notify" API service
   - platform: template
     id: notif_msg
@@ -333,10 +328,10 @@ binary_sensor:
             then:
               - lvgl.tabview.select: {id: tabs, index: 4}
 
-  # ── Grove motion sensor (GPIO2, PIR) ────────────────────────
+  # ── Grove port (GPIO2 — PIR motion sensor, button, etc.) ─────
   - platform: gpio
     id: pir_motion
-    name: "Motion"
+    name: "Grove Port"
     device_class: motion
     pin:
       number: GPIO2
@@ -353,3 +348,5 @@ binary_sensor:
       inverted: true
       mode: INPUT_PULLUP
     name: "Flash Button"
+
+

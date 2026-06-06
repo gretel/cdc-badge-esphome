@@ -1,9 +1,9 @@
 /**
  * @file lt_l2_frame_check.c
  * @brief Layer 2 frame check functions definitions
- * @copyright Copyright (c) 2020-2025 Tropic Square s.r.o.
+ * @copyright Copyright (c) 2020-2026 Tropic Square s.r.o.
  *
- * @license For the license see file LICENSE.txt file in the root directory of this source tree.
+ * @license For the license see LICENSE.md in the root directory of this source tree.
  */
 
 #include "lt_l2_frame_check.h"
@@ -18,16 +18,24 @@ lt_ret_t lt_l2_frame_check(const uint8_t *frame)
         return LT_PARAM_ERR;
     }
 #endif
-    // Take status, len and crc values from incomming frame
-    uint8_t status = frame[1];
-    uint8_t len = frame[2];
-    uint16_t frame_crc = frame[len + 4] | frame[len + 3] << 8;
+
+    // Extract STATUS, RSP_LEN and RSP_CRC fields. Verify that RSP_LEN is in bounds.
+    uint8_t status = frame[TR01_L2_STATUS_OFFSET];
+    uint8_t len = frame[TR01_L2_RSP_LEN_OFFSET];
+
+    if (len > TR01_L2_CHUNK_MAX_DATA_SIZE) {
+        return LT_L2_RSP_LEN_ERROR;
+    }
+
+    uint16_t frame_crc = frame[len + TR01_L2_RSP_DATA_RSP_CRC_OFFSET + 1] |
+                         frame[len + TR01_L2_RSP_DATA_RSP_CRC_OFFSET] << 8;
 
     switch (status) {
-        // Valid frames, or crc errors in INCOMMING frames are handled here:
+        // Valid frames, or CRC errors in incoming frames are handled here:
         case TR01_L2_STATUS_REQUEST_OK:
         case TR01_L2_STATUS_RESULT_OK:
-            if (frame_crc != crc16(frame + 1, len + 2)) {
+            if (frame_crc != crc16(frame + TR01_L2_STATUS_OFFSET,
+                                   TR01_L2_STATUS_SIZE + TR01_L2_REQ_RSP_LEN_SIZE + len)) {
                 return LT_L2_IN_CRC_ERR;
             }
             return LT_OK;

@@ -48,6 +48,15 @@ Now edit `secrets.yaml` with your
 esphome run cdc-badge.yaml
 ```
 
+## Integration test
+
+[`test/`](test/README.md) — exercises all badge services through Home Assistant
+WebSocket API: notify, blink, R-Memory read/write/erase.
+
+```sh
+test/.venv/bin/python test/integration_test.py all
+```
+
 ## Reusable components
 
 This repo provides two reusable [external_components](https://esphome.io/components/external_components/):
@@ -109,7 +118,7 @@ external_components:
 | `notify` | `message: string` | Push text to display, blink backlight 5s |
 | `blink_display` | — | Blink backlight |
 | `se_write` | `slot: int, data: string` | Write TROPIC01 R-Memory slot |
-| `se_read` | `slot: int` | Read TROPIC01 R-Memory slot → sensor value |
+| `se_read` | `slot: int` | Read R-Memory slot → `{"value": …}` on success, `{"success": false, "error_message": …}` if empty |
 | `se_erase` | `slot: int` | Erase TROPIC01 R-Memory slot |
 
 ### Sensors
@@ -130,7 +139,10 @@ external_components:
 | USB Bus Status | `usb_bus_status` | text | BQ25895 status register |
 | IP Address | `ip_addr` | text | WiFi |
 | SSID | `wifi_ssid` | text | WiFi |
-| SE R-Memory | `se_r_mem_value` | text | TROPIC01 read result |
+| TROPIC01 Chip Mode | `tr01_chip_mode` | text | secure element |
+| TROPIC01 RISC-V Version | `tr01_fw_rv` | text | secure element |
+| TROPIC01 SPECT Version | `tr01_fw_spect` | text | secure element |
+| TROPIC01 Serial | `tr01_serial` | text | secure element |
 | Notification | `notif_msg` | text | set via `notify` service |
 
 ### Binary sensors
@@ -140,9 +152,11 @@ external_components:
 | Status (connectivity) | — | ESPHome |
 | Key 0-9 | `key_0`..`key_9` | TCA9535 |
 | Key YES / NO | `key_yes` / `key_no` | TCA9535 |
-| Motion | `pir_motion` | Grove port (GPIO2) |
+| Grove Port | `pir_motion` | GPIO2 (PIR/button) |
 | Flash Button | `flash_button` | GPIO0 |
 | VBUS Connected | `charger_vbus` | BQ25895 |
+| TROPIC01 Tamper Alarm | `tr01_alarm` | secure element |
+| TROPIC01 Maintenance Mode | `tr01_maintenance` | secure element |
 
 ### Buttons
 
