@@ -11,7 +11,7 @@ ESPHome firmware for the [CDC Badge](https://github.com/riatlabs/cdc-badge).
 - CDC Badge hardware
 - USB-C cable (first flash only)
 - Python 3.9+
-- [`uv`](https://docs.ashral.sh/uv/getting-started/installation/) or `pip`
+- [`uv`](https://docs.ashral.sh/uv/getting-started/installation/)
 
 ### Get the source
 
