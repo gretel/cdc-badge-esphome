@@ -12,9 +12,9 @@
 /**
  * @file lt_l2_frame_check.h
  * @brief Layer 2 frame check functions declarations
- * @copyright Copyright (c) 2020-2025 Tropic Square s.r.o.
+ * @copyright Copyright (c) 2020-2026 Tropic Square s.r.o.
  *
- * @license For the license see file LICENSE.txt file in the root directory of this source tree.
+ * @license For the license see LICENSE.md in the root directory of this source tree.
  */
 
 #include <stdint.h>

@@ -4,9 +4,9 @@
 /**
  * @file   lt_hmac_sha256.h
  * @brief  HMAC SHA256 functions declarations
- * @copyright Copyright (c) 2020-2025 Tropic Square s.r.o.
+ * @copyright Copyright (c) 2020-2026 Tropic Square s.r.o.
  *
- * @license For the license see file LICENSE.txt file in the root directory of this source tree.
+ * @license For the license see LICENSE.md in the root directory of this source tree.
  */
 
 #include <stddef.h>
@@ -33,8 +33,8 @@ extern "C" {
  * @param output     Output buffer
  * @return           LT_OK if success, otherwise returns other error code.
  */
-lt_ret_t lt_hmac_sha256(const uint8_t *key, const uint32_t key_len, const uint8_t *input, const uint32_t input_len,
-                        uint8_t *output) __attribute__((warn_unused_result));
+lt_ret_t lt_hmac_sha256(const uint8_t *key, const uint32_t key_len, const uint8_t *input,
+                        const uint32_t input_len, uint8_t *output) __attribute__((warn_unused_result));
 
 #ifdef __cplusplus
 }

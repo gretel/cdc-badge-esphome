@@ -1,8 +1,8 @@
 /**
  * @file lt_mbedtls_v4_hmac_sha256.c
- * @copyright Copyright (c) 2020-2025 Tropic Square s.r.o.
+ * @copyright Copyright (c) 2020-2026 Tropic Square s.r.o.
  *
- * @license For the license see file LICENSE.txt file in the root directory of this source tree.
+ * @license For the license see LICENSE.md in the root directory of this source tree.
  */
 
 #include <inttypes.h>
@@ -16,8 +16,8 @@
 #include "libtropic_logging.h"
 #include "lt_hmac_sha256.h"
 
-lt_ret_t lt_hmac_sha256(const uint8_t *key, const uint32_t key_len, const uint8_t *input, const uint32_t input_len,
-                        uint8_t *output)
+lt_ret_t lt_hmac_sha256(const uint8_t *key, const uint32_t key_len, const uint8_t *input,
+                        const uint32_t input_len, uint8_t *output)
 {
     psa_status_t status;
     psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
@@ -51,7 +51,8 @@ lt_ret_t lt_hmac_sha256(const uint8_t *key, const uint32_t key_len, const uint8_
     }
 
     if (destroy_key_status != PSA_SUCCESS) {
-        LT_LOG_ERROR("Couldn't destroy HMAC key, status=%" PRId32 " (psa_status_t)", destroy_key_status);
+        LT_LOG_ERROR("Couldn't destroy HMAC key, status=%" PRId32 " (psa_status_t)",
+                     destroy_key_status);
         return LT_CRYPTO_ERR;
     }
 

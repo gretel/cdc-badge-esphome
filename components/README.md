@@ -110,9 +110,31 @@ tropic01:
     name: "Tamper Alarm"
 ```
 
-The component auto-creates its text_sensor and binary_sensor sub-entries.
-No separate `sensor:` / `text_sensor:` platform config needed — everything is
-under the `tropic01:` key.
+Sensors are declared as standard sub-platforms (not inline under `tropic01:`):
+
+```yaml
+tropic01:
+  id: my_tr01
+  cs_pin: GPIO10
+
+text_sensor:
+  - platform: tropic01
+    tropic01_id: my_tr01
+    chip_mode:
+      name: "Chip Mode"
+    fw_version_riscv:
+      name: "RISC-V FW"
+    fw_version_spect:
+      name: "Spect FW"
+    chip_serial:
+      name: "Serial"
+
+binary_sensor:
+  - platform: tropic01
+    tropic01_id: my_tr01
+    alarm:
+      name: "Tamper Alarm"
+```
 
 ### Code access
 

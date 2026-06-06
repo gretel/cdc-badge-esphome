@@ -1,15 +1,29 @@
 #pragma once
 
 #include "esphome/core/component.h"
-#include "esphome/components/text_sensor/text_sensor.h"
-#include "esphome/components/binary_sensor/binary_sensor.h"
 #include "driver/gpio.h"
+#include "tropic01_base.h"
 
-// Forward declare libtropic handle (defined in libtropic_common.h)
+#include <memory>
+#include <vector>
+
+#include "driver/spi_master.h"
+
+// Forward declare libtropic types (defined in libtropic_*.h, included in .cpp)
+// Only lt_dev_esp32_t is fully defined here for unique_ptr; the others use
+// raw pointers with explicit cleanup in destructor to avoid mbedTLS header chain.
 struct lt_handle_t;
+struct lt_ctx_mbedtls_v4_t;
+
+// SPI port device context — full definition needed for unique_ptr<lt_dev_esp32_t>
+struct lt_dev_esp32_t {
+  spi_device_handle_t spi{};
+  gpio_num_t cs_pin{GPIO_NUM_10};
+};
 
 namespace esphome::tropic01 {
 
+// Operating mode of the TROPIC01 secure element.
 enum class ChipMode : uint8_t {
   UNKNOWN = 0,
   MAINTENANCE,
@@ -22,16 +36,14 @@ class Tropic01Component : public PollingComponent {
   void set_cs_pin(int pin) { cs_pin_ = static_cast<gpio_num_t>(pin); }
   void set_spi_data_rate(uint32_t hz) { spi_data_rate_ = hz; }
 
-  // Entity setters (called by codegen)
-  void set_chip_mode_sensor(text_sensor::TextSensor *s) { chip_mode_sensor_ = s; }
-  void set_fw_riscv_sensor(text_sensor::TextSensor *s) { fw_riscv_sensor_ = s; }
-  void set_fw_spect_sensor(text_sensor::TextSensor *s) { fw_spect_sensor_ = s; }
-  void set_chip_serial_sensor(text_sensor::TextSensor *s) { chip_serial_sensor_ = s; }
-  void set_alarm_sensor(binary_sensor::BinarySensor *s) { alarm_sensor_ = s; }
+  // Listener registration — sub-platform sensors call this from to_code
+  void add_listener(Tropic01Listener *listener) { listeners_.push_back(listener); }
 
-  // R-Memory storage (requires L3 secure session)
+  // R-Memory storage (requires L3 secure session).
+  // r_mem_read returns 0 on success, non-zero error code on failure.
+  // Empty/unwritten slots return LT_L3_R_MEM_DATA_READ_SLOT_EMPTY (non-zero).
   void r_mem_write(uint16_t slot, const uint8_t *data, uint16_t data_size);
-  void r_mem_read(uint16_t slot, uint16_t &read_len);
+  int r_mem_read(uint16_t slot, uint16_t &read_len);
   const uint8_t *r_mem_buf() const { return r_mem_read_buf_; }
   void r_mem_erase(uint16_t slot);
 
@@ -39,29 +51,40 @@ class Tropic01Component : public PollingComponent {
   void setup() override;
   void update() override;
   void dump_config() override;
-  float get_setup_priority() const override { return setup_priority::AFTER_WIFI; }
+  void on_safe_shutdown() override;
+  void on_shutdown() override;
+  bool teardown() override;
+  void on_powerdown() override;
+  ~Tropic01Component();
+  float get_setup_priority() const override { return setup_priority::DATA; }
+
+  // True if the default factory pairing key is no longer valid
+  // (user has customized the pairing key).  When true, we refuse
+  // to establish secure sessions with the default key to avoid
+  // lockout from repeated failed handshakes.
+  bool default_key_invalid() const { return default_key_invalid_; }
 
  protected:
   bool init_tropic();
   void update_sensors();
   ChipMode read_chip_mode();
-  bool read_fw_versions();
-  bool read_chip_id();
+  bool read_fw_versions(Tropic01Data &data);
+  bool read_chip_id(Tropic01Data &data);
+  bool ensure_secure_session();
 
   gpio_num_t cs_pin_{GPIO_NUM_10};
   uint32_t spi_data_rate_{10 * 1000 * 1000};
 
-  text_sensor::TextSensor *chip_mode_sensor_{nullptr};
-  text_sensor::TextSensor *fw_riscv_sensor_{nullptr};
-  text_sensor::TextSensor *fw_spect_sensor_{nullptr};
-  text_sensor::TextSensor *chip_serial_sensor_{nullptr};
-  binary_sensor::BinarySensor *alarm_sensor_{nullptr};
+  std::vector<Tropic01Listener *> listeners_;
 
-  bool ensure_secure_session();
-
+  // Resources (destroyed in reverse declaration order)
   lt_handle_t *handle_{nullptr};
+  lt_ctx_mbedtls_v4_t *crypto_ctx_{nullptr};
+  std::unique_ptr<lt_dev_esp32_t> dev_;
   bool initialized_{false};
   bool session_established_{false};
+  bool default_key_invalid_{false};  // Default pairing key no longer matches slot 0
+  bool lockout_warned_{false};       // Only log lockout warning once
   uint8_t r_mem_read_buf_[512]{};
 };
 

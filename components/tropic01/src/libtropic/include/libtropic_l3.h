@@ -3,13 +3,14 @@
 
 /**
  * @defgroup libtropic_l3 4. Layer 3
- * @brief Expected to be used by an application when using separate calls for L3 data out and L3 data in
- * @details This module provides functions for separate L3 communication with TROPIC01. Function prepended with
- * 'lt_out__' are used to prepare data for sending to TROPIC01, while functions prepended with 'lt_in__' are used to
- * decode data received from TROPIC01.
+ * @brief Expected to be used by an application when using separate calls for L3 data out and L3 data
+ * in
+ * @details This module provides functions for separate L3 communication with TROPIC01. Function
+ * prepended with 'lt_out__' are used to prepare data for sending to TROPIC01, while functions
+ * prepended with 'lt_in__' are used to decode data received from TROPIC01.
  *
- * Sending and receiving data is done through L2 layer, which is not covered by this module and user is expected to call
- * lt_l2_send() at the point when data is ready to be sent to TROPIC01.
+ * Sending and receiving data is done through L2 layer, which is not covered by this module and user is
+ * expected to call lt_l2_send() at the point when data is ready to be sent to TROPIC01.
  *
  * For more information have a look into `libtropic.c`, how separate calls are used in a single call.
  * @{
@@ -18,9 +19,9 @@
 /**
  * @file libtropic_l3.h
  * @brief Layer 3 functions declarations
- * @copyright Copyright (c) 2020-2025 Tropic Square s.r.o.
+ * @copyright Copyright (c) 2020-2026 Tropic Square s.r.o.
  *
- * @license For the license see file LICENSE.txt file in the root directory of this source tree.
+ * @license For the license see LICENSE.md in the root directory of this source tree.
  */
 
 #include <stdbool.h>
@@ -40,29 +41,32 @@ extern "C" {
  *
  * @param h              Handle for communication with TROPIC01
  * @param pkey_index     Index of pairing public key
- * @param host_eph_keys  Host MCU ephemeral keys, used to finish secure session establishment in lt_in__session_start().
+ * @param host_eph_keys  Host MCU ephemeral keys, used to finish secure session establishment in
+ * lt_in__session_start().
  * @return               LT_OK if success, otherwise returns other error code.
  */
-lt_ret_t lt_out__session_start(lt_handle_t *h, const lt_pkey_index_t pkey_index, lt_host_eph_keys_t *host_eph_keys);
+lt_ret_t lt_out__session_start(lt_handle_t *h, const lt_pkey_index_t pkey_index,
+                               lt_host_eph_keys_t *host_eph_keys);
 
 /**
  * @brief Decodes TROPIC01's response during secure session's establishment.
  *
  * Designed to be used together with `lt_out__session_start()`, `lt_l2_send()` and `lt_l2_receive()`.
- * @note Secure session will be established after successful execution. For more information read info at the top of
- * this file.
+ * @note Secure session will be established after successful execution. For more information read info
+ * at the top of this file.
  *
  * @param h              Handle for communication with TROPIC01
  * @param stpub          STPUB from device's certificate
  * @param pkey_index     Index of pairing public key
  * @param shipriv        Secure host private key
  * @param shipub         Secure host public key
- * @param host_eph_keys  Host MCU ephemeral keys, must be filled by lt_out__session_start() and used to finish secure
- * session establishment.
+ * @param host_eph_keys  Host MCU ephemeral keys, must be filled by lt_out__session_start() and used to
+ * finish secure session establishment.
  * @return               LT_OK if success, otherwise returns other error code.
  */
 lt_ret_t lt_in__session_start(lt_handle_t *h, const uint8_t *stpub, const lt_pkey_index_t pkey_index,
-                              const uint8_t *shipriv, const uint8_t *shipub, lt_host_eph_keys_t *host_eph_keys);
+                              const uint8_t *shipriv, const uint8_t *shipub,
+                              lt_host_eph_keys_t *host_eph_keys);
 
 /**
  * @brief Encodes Ping command payload.
@@ -95,10 +99,11 @@ lt_ret_t lt_in__ping(lt_handle_t *h, uint8_t *msg_in, const uint16_t msg_len);
  *
  * @param h           Handle for communication with TROPIC01
  * @param pairing_pub 32B of pubkey
- * @param slot        Pairing key lot SH0PUB - SH3PUB
+ * @param slot        Pairing key slot index
  * @return            LT_OK if success, otherwise returns other error code.
  */
-lt_ret_t lt_out__pairing_key_write(lt_handle_t *h, const uint8_t *pairing_pub, const uint8_t slot);
+lt_ret_t lt_out__pairing_key_write(lt_handle_t *h, const uint8_t *pairing_pub,
+                                   const lt_pkey_index_t slot);
 /**
  * @brief Decodes Pairing_Key_Write result payload.
  * @note Used for separate L3 communication, for more information read info
@@ -115,10 +120,10 @@ lt_ret_t lt_in__pairing_key_write(lt_handle_t *h);
  * at the top of this file.
  *
  * @param h           Handle for communication with TROPIC01
- * @param slot        Slot to read pairing key from
+ * @param slot        Pairing key slot index
  * @return            LT_OK if success, otherwise returns other error code.
  */
-lt_ret_t lt_out__pairing_key_read(lt_handle_t *h, const uint8_t slot);
+lt_ret_t lt_out__pairing_key_read(lt_handle_t *h, const lt_pkey_index_t slot);
 
 /**
  * @brief Decodes Pairing_Key_Read result payload.
@@ -137,10 +142,10 @@ lt_ret_t lt_in__pairing_key_read(lt_handle_t *h, uint8_t *pubkey);
  * read info at the top of this file.
  *
  * @param h           Handle for communication with TROPIC01
- * @param slot        Slot to invalidate pairing key in
+ * @param slot        Pairing key slot index
  * @return            LT_OK if success, otherwise returns other error code.
  */
-lt_ret_t lt_out__pairing_key_invalidate(lt_handle_t *h, const uint8_t slot);
+lt_ret_t lt_out__pairing_key_invalidate(lt_handle_t *h, const lt_pkey_index_t slot);
 
 /**
  * @brief Decodes Pairing_Key_Invalidate result payload.
@@ -162,7 +167,8 @@ lt_ret_t lt_in__pairing_key_invalidate(lt_handle_t *h);
  * @param obj         Content to be written
  * @return            LT_OK if success, otherwise returns other error code.
  */
-lt_ret_t lt_out__r_config_write(lt_handle_t *h, const enum lt_config_obj_addr_t addr, const uint32_t obj);
+lt_ret_t lt_out__r_config_write(lt_handle_t *h, const enum lt_config_obj_addr_t addr,
+                                const uint32_t obj);
 
 /**
  * @brief Decodes R_Config_Write result payload.
@@ -226,7 +232,8 @@ lt_ret_t lt_in__r_config_erase(lt_handle_t *h);
  * @param bit_index   Bit index to write in the configuration object
  * @return            LT_OK if success, otherwise returns other error code.
  */
-lt_ret_t lt_out__i_config_write(lt_handle_t *h, const enum lt_config_obj_addr_t addr, const uint8_t bit_index);
+lt_ret_t lt_out__i_config_write(lt_handle_t *h, const enum lt_config_obj_addr_t addr,
+                                const uint8_t bit_index);
 
 /**
  * @brief Decodes I_Config_Write result payload.
@@ -268,8 +275,8 @@ lt_ret_t lt_in__i_config_read(lt_handle_t *h, uint32_t *obj);
  * @param h           Handle for communication with TROPIC01
  * @param udata_slot  Memory's slot to be written
  * @param data        Buffer of data to be written into R MEMORY slot
- * @param data_size   Size of data to be written (valid range given by macros `TR01_R_MEM_DATA_SIZE_MIN` and
- * `TR01_R_MEM_DATA_SIZE_MAX`)
+ * @param data_size   Size of data to be written (valid range given by macros
+ * `TR01_R_MEM_DATA_SIZE_MIN` and `TR01_R_MEM_DATA_SIZE_MAX`)
  * @return            LT_OK if success, otherwise returns other error code.
  */
 lt_ret_t lt_out__r_mem_data_write(lt_handle_t *h, const uint16_t udata_slot, const uint8_t *data,
@@ -307,7 +314,8 @@ lt_ret_t lt_out__r_mem_data_read(lt_handle_t *h, const uint16_t udata_slot);
  * @param data_read_size   Number of bytes read into data buffer
  * @return            LT_OK if success, otherwise returns other error code.
  */
-lt_ret_t lt_in__r_mem_data_read(lt_handle_t *h, uint8_t *data, const uint16_t data_max_size, uint16_t *data_read_size);
+lt_ret_t lt_in__r_mem_data_read(lt_handle_t *h, uint8_t *data, const uint16_t data_max_size,
+                                uint16_t *data_read_size);
 
 /**
  * @brief Encodes R_Mem_Data_Erase command payload.
@@ -339,7 +347,7 @@ lt_ret_t lt_in__r_mem_data_erase(lt_handle_t *h);
  * @param rnd_bytes_cnt   Number of random bytes to get (255 bytes is the maximum)
  * @return                LT_OK if success, otherwise returns other error code.
  */
-lt_ret_t lt_out__random_value_get(lt_handle_t *h, const uint16_t rnd_bytes_cnt);
+lt_ret_t lt_out__random_value_get(lt_handle_t *h, const uint8_t rnd_bytes_cnt);
 
 /**
  * @brief Decodes Random_Value_Get result payload.
@@ -351,7 +359,7 @@ lt_ret_t lt_out__random_value_get(lt_handle_t *h, const uint16_t rnd_bytes_cnt);
  * @param rnd_bytes_cnt     Number of random bytes to get (255 bytes is the maximum)
  * @return                  LT_OK if success, otherwise returns other error code.
  */
-lt_ret_t lt_in__random_value_get(lt_handle_t *h, uint8_t *rnd_bytes, const uint16_t rnd_bytes_cnt);
+lt_ret_t lt_in__random_value_get(lt_handle_t *h, uint8_t *rnd_bytes, const uint8_t rnd_bytes_cnt);
 
 /**
  * @brief Encodes ECC_Key_Generate command payload.
@@ -363,7 +371,8 @@ lt_ret_t lt_in__random_value_get(lt_handle_t *h, uint8_t *rnd_bytes, const uint1
  * @param curve       ECC curve type to use for key generation
  * @return            LT_OK if success, otherwise returns other error code.
  */
-lt_ret_t lt_out__ecc_key_generate(lt_handle_t *h, const lt_ecc_slot_t slot, const lt_ecc_curve_type_t curve);
+lt_ret_t lt_out__ecc_key_generate(lt_handle_t *h, const lt_ecc_slot_t slot,
+                                  const lt_ecc_curve_type_t curve);
 
 /**
  * @brief Decodes ECC_Key_Generate result payload.
@@ -386,8 +395,8 @@ lt_ret_t lt_in__ecc_key_generate(lt_handle_t *h);
  * @param key         Ecc key to store, 32B length
  * @return            LT_OK if success, otherwise returns other error code.
  */
-lt_ret_t lt_out__ecc_key_store(lt_handle_t *h, const lt_ecc_slot_t slot, const lt_ecc_curve_type_t curve,
-                               const uint8_t *key);
+lt_ret_t lt_out__ecc_key_store(lt_handle_t *h, const lt_ecc_slot_t slot,
+                               const lt_ecc_curve_type_t curve, const uint8_t *key);
 
 /**
  * @brief Decodes ECC_Key_Store result payload.
@@ -416,16 +425,17 @@ lt_ret_t lt_out__ecc_key_read(lt_handle_t *h, const lt_ecc_slot_t slot);
  * the top of this file.
  *
  * @param h              Handle for communication with TROPIC01
- * @param key            Buffer for retrieving a key; length depends on the type of key in the slot (32B for Ed25519,
- * 64B for P256), according to *curve*
+ * @param key            Buffer for retrieving a key; length depends on the type of key in the slot
+ * (32B for Ed25519, 64B for P256), according to *curve*
  * @param key_max_size   Size of the key buffer
- * @param curve          When the function executes successfully, the type of elliptic curve public key will be written
- * @param origin         When the function executes successfully, the origin of the public key (generated/stored) will
- * be written
+ * @param curve          When the function executes successfully, the type of elliptic curve public key
+ * will be written
+ * @param origin         When the function executes successfully, the origin of the public key
+ * (generated/stored) will be written
  * @return               LT_OK if success, otherwise returns other error code.
  */
-lt_ret_t lt_in__ecc_key_read(lt_handle_t *h, uint8_t *key, const uint8_t key_max_size, lt_ecc_curve_type_t *curve,
-                             lt_ecc_key_origin_t *origin);
+lt_ret_t lt_in__ecc_key_read(lt_handle_t *h, uint8_t *key, const uint8_t key_max_size,
+                             lt_ecc_curve_type_t *curve, lt_ecc_key_origin_t *origin);
 
 /**
  * @brief Encodes ECC_Key_Erase command payload.
@@ -453,13 +463,14 @@ lt_ret_t lt_in__ecc_key_erase(lt_handle_t *h);
  * @note Used for separate L3 communication, for more information read info
  * at the top of this file.
  *
- * @param h           Handle for communication with TROPIC01
- * @param slot        ECC key slot to use for signing
- * @param msg         Message to sign
- * @param msg_len     Length of the message
- * @return            LT_OK if success, otherwise returns other error code.
+ * @param h            Handle for communication with TROPIC01
+ * @param slot         ECC key slot to use for signing
+ * @param msg_hash     Buffer containing a 32-byte hash of the message to sign
+ * @param msg_hash_len Length of the hash; must be exactly 32 bytes
+ * @return             LT_OK if success, otherwise returns other error code
  */
-lt_ret_t lt_out__ecc_ecdsa_sign(lt_handle_t *h, const lt_ecc_slot_t slot, const uint8_t *msg, const uint32_t msg_len);
+lt_ret_t lt_out__ecc_ecdsa_sign(lt_handle_t *h, const lt_ecc_slot_t slot, const uint8_t *msg_hash,
+                                const uint32_t msg_hash_len);
 
 /**
  * @brief Decodes ECDSA_Sign result payload.
@@ -467,7 +478,8 @@ lt_ret_t lt_out__ecc_ecdsa_sign(lt_handle_t *h, const lt_ecc_slot_t slot, const 
  * the top of this file.
  *
  * @param h           Handle for communication with TROPIC01
- * @param rs          Buffer with a signature in a form of R and S bytes (should always have length 64B)
+ * @param rs          Buffer with a signature in a form of R and S bytes (should always have length
+ * 64B)
  * @return            LT_OK if success, otherwise returns other error code.
  */
 lt_ret_t lt_in__ecc_ecdsa_sign(lt_handle_t *h, uint8_t *rs);
@@ -492,7 +504,8 @@ lt_ret_t lt_out__ecc_eddsa_sign(lt_handle_t *h, const lt_ecc_slot_t ecc_slot, co
  * the top of this file.
  *
  * @param h           Handle for communication with TROPIC01
- * @param rs          Buffer with a signature in a form of R and S bytes (should always have length 64B)
+ * @param rs          Buffer with a signature in a form of R and S bytes (should always have length
+ * 64B)
  * @return            LT_OK if success, otherwise returns other error code.
  */
 lt_ret_t lt_in__ecc_eddsa_sign(lt_handle_t *h, uint8_t *rs);
@@ -507,8 +520,8 @@ lt_ret_t lt_in__ecc_eddsa_sign(lt_handle_t *h, uint8_t *rs);
  * @param mcounter_value  Value to set as an initial value
  *
  * @retval                LT_OK Function executed successfully
- * @retval                other Function did not execute successully, you might use lt_ret_verbose() to get verbose
- * encoding of returned value
+ * @retval                other Function did not execute successully, you might use lt_ret_verbose() to
+ * get verbose encoding of returned value
  */
 lt_ret_t lt_out__mcounter_init(lt_handle_t *h, const enum lt_mcounter_index_t mcounter_index,
                                const uint32_t mcounter_value);
@@ -576,7 +589,8 @@ lt_ret_t lt_in__mcounter_get(lt_handle_t *h, uint32_t *mcounter_value);
  * @param data_out    Data to be sent out, must be 32 bytes long
  * @return            LT_OK if success, otherwise returns other error code.
  */
-lt_ret_t lt_out__mac_and_destroy(lt_handle_t *h, lt_mac_and_destroy_slot_t slot, const uint8_t *data_out);
+lt_ret_t lt_out__mac_and_destroy(lt_handle_t *h, lt_mac_and_destroy_slot_t slot,
+                                 const uint8_t *data_out);
 
 /**
  * @brief Decodes MAC_And_Destroy result payload.

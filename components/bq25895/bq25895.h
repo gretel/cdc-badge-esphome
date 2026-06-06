@@ -83,15 +83,7 @@ class BQ25895Listener {
 
 class BQ25895Component : public PollingComponent, public i2c::I2CDevice {
  public:
-  BQ25895Component(bool led_enabled, uint16_t input_current_limit, uint16_t charge_voltage, uint16_t charge_current,
-                   uint16_t precharge_current, bool charge_enabled, bool enable_adc)
-      : led_enabled_(led_enabled),
-        input_current_limit_(input_current_limit),
-        charge_voltage_(charge_voltage),
-        charge_current_(charge_current),
-        precharge_current_(precharge_current),
-        charge_enabled_(charge_enabled),
-        enable_adc_(enable_adc) {}
+  BQ25895Component() = default;
   void setup() override;
   void dump_config() override;
   void update() override;
@@ -117,14 +109,14 @@ class BQ25895Component : public PollingComponent, public i2c::I2CDevice {
   BQ25895Data data_{};
   std::vector<BQ25895Listener *> listeners_;
 
-  // Configuration values to set during setup()
-  bool led_enabled_;
-  uint16_t input_current_limit_;
-  uint16_t charge_voltage_;
-  uint16_t charge_current_;
-  uint16_t precharge_current_;
-  bool charge_enabled_;
-  bool enable_adc_;
+  // Configuration values (set via Python to_code before setup())
+  bool led_enabled_{true};
+  uint16_t input_current_limit_{500};
+  uint16_t charge_voltage_{4208};
+  uint16_t charge_current_{2048};
+  uint16_t precharge_current_{128};
+  bool charge_enabled_{true};
+  bool enable_adc_{true};
 };
 
 }  // namespace esphome::bq25895

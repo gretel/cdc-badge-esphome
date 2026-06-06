@@ -29,11 +29,6 @@ text_sensor:
       id: usb_bus_status
       name: "USB Bus Status"
 
-  # TROPIC01 R-Memory read result (set by the se_read API service)
-  - platform: template
-    id: se_r_mem_value
-    name: "SE R-Memory Value"
-
   # Notification message — set from HA via the "notify" API service
   - platform: template
     id: notif_msg
@@ -236,12 +231,12 @@ binary_sensor:
       mode: INPUT
       inverted: true
 
-  # ── Grove motion sensor (GPIO2, PIR) ────────────────────────
+  # ── Grove port (GPIO2 — PIR motion sensor, button, etc.) ─────
   # GPIO2 is a bare input with no external pull.  Debounce filters suppress
   # electrical noise on the floating line.
   - platform: gpio
     id: pir_motion
-    name: "Motion"
+    name: "Grove Port"
     device_class: motion
     pin:
       number: GPIO2
@@ -260,3 +255,5 @@ binary_sensor:
       inverted: true
       mode: INPUT_PULLUP
     name: "Flash Button"
+
+
