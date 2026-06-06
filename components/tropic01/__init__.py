@@ -59,7 +59,7 @@ async def to_code(config):
     )
 
     # libtropic configuration (use build flags, not add_define, so C files see them)
-    cg.add_build_flag("-DACAB")
+    cg.add_build_flag("-DLT_SILICON_REV_ACAB")
     cg.add_build_flag("-DLT_HELPERS")
     cg.add_build_flag("-DLT_LOG_ENABLE_ERROR=1")
     cg.add_build_flag("-DLT_LOG_ENABLE_WARN=0")

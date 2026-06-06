@@ -30,3 +30,6 @@ binary_sensor:
     alarm:
       id: tr01_alarm
       name: "TROPIC01 Tamper Alarm"       # true if chip detects physical tampering
+    maintenance:
+      id: tr01_maintenance
+      name: "TROPIC01 Maintenance Mode"    # true if chip is in bootloader (no App FW)

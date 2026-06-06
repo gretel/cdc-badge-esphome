@@ -4,9 +4,9 @@
 /**
  * @file lt_tr01_attrs.h
  * @brief Declarations for handling TROPIC01 attributes based on FW versions.
- * @copyright Copyright (c) 2020-2025 Tropic Square s.r.o.
+ * @copyright Copyright (c) 2020-2026 Tropic Square s.r.o.
  *
- * @license For the license see file LICENSE.txt file in the root directory of this source tree.
+ * @license For the license see LICENSE.md in the root directory of this source tree.
  */
 
 #include <stdint.h>
@@ -15,10 +15,13 @@
 
 /**
  * @brief Initializes the lt_tr01_attrs_t structure based on the read Application FW version.
+ * @warning This function expects that TROPIC01 is executing Application FW, otherwise Get_Info_Req for
+ * the Application FW version will fail.
  *
  * @param h   Handle for communication with TROPIC01
  * @retval    LT_OK Function executed successfully
- * @retval    other Function did not execute successully, you might use lt_ret_verbose() to get verbose encoding
+ * @retval    other Function did not execute successully, you might use lt_ret_verbose() to get verbose
+ * encoding
  */
 lt_ret_t lt_init_tr01_attrs(lt_handle_t *h) __attribute__((warn_unused_result));
 

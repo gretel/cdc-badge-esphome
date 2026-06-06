@@ -1,12 +1,12 @@
 /**
- * @file lt_secure_memzero.c
+ * @file libtropic_secure_memzero.c
  * @brief Implementation of secure memory zeroing.
- * @copyright Copyright (c) 2020-2025 Tropic Square s.r.o.
+ * @copyright Copyright (c) 2020-2026 Tropic Square s.r.o.
  *
- * @license For the license see file LICENSE.txt file in the root directory of this source tree.
+ * @license For the license see LICENSE.md in the root directory of this source tree.
  */
 
-#include "lt_secure_memzero.h"
+#include "libtropic_secure_memzero.h"
 
 #include <stddef.h>
 #include <string.h>
