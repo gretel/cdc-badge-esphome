@@ -100,7 +100,7 @@ sensor:
     id: battery_pct
     name: "Battery Level"
     unit_of_measurement: "%"
-    update_interval: 30s
+    update_interval: 120s
     lambda: |-
       if (!id(batt_voltage).has_state()) return NAN;
       float v = id(batt_voltage).state;

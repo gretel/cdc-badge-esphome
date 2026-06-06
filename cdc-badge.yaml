@@ -38,7 +38,6 @@ substitutions:
   # Display
   font_large: "14"
   font_small: "12"
-  display_update_default: "60"      # seconds between periodic e-paper refreshes
   display_width: "128"
   display_height: "296"
   full_update_interval: "10"         # full flash (not partial) every Nth update

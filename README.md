@@ -54,7 +54,7 @@ esphome run cdc-badge.yaml
 WebSocket API: notify, blink, R-Memory read/write/erase.
 
 ```sh
-test/.venv/bin/python test/integration_test.py all
+cd test && uv run integration_test.py all
 ```
 
 ## Reusable components
